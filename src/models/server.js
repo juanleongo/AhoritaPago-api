@@ -11,6 +11,12 @@ class Server {
        this.app = express()
        this.port = process.env.PORT 
        this.paths = {
+        auth:       '/api/auth',
+        group:       '/api/group',
+        payment:      '/api/payment',
+        user:         '/api/user',
+        transaction:  '/api/transaction',
+        admin:         '/api/admin',
        
        }
       
@@ -44,7 +50,9 @@ class Server {
     }
 
     routes() {
-        
+        this.app.use( this.paths.group, require('../routes/group'))
+        this.app.use(this.paths.user, require('../routes/user'))
+        this.app.use(this.paths.auth, require('../routes/auth'))
         
     }
 

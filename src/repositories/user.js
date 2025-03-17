@@ -1,4 +1,4 @@
-const {User } = require('../models/user')
+const User  = require('../models/user')
 
 const getAllUsers = async () => {
     const users = await User.findAll()
@@ -8,7 +8,11 @@ const getAllUsers = async () => {
 
 const getUserById = async (id) => {
     const user = await User.findById(id)
+    return user
 
+}
+const getUserByEmail = async (email) => {
+    const user = await  User.findOne( { email })
     return user
 
 }
@@ -35,6 +39,7 @@ module.exports = {
     getUserById,
     createUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    getUserByEmail
 
 }

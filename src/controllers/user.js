@@ -22,13 +22,15 @@ const getUserById = async (req, res) => {
     }
 };
 
-const createUser = async (req, res) => {
+const createUser = async (req,  res= response) => {
     try {
         const newUser = await userService.createUser(req.body);
         res.status(201).json(newUser);
     } catch (error) {
+        console.error(error)
         res.status(500).json({ message: error.message });
     }
+
 };
 
 const updateUser = async (req, res) => {

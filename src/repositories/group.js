@@ -1,4 +1,4 @@
-const {Group} = require('../models/group')
+const Group = require('../models/group')
 
 const createGroup = async (groupData) => {
     const newGroup = await Group.create(groupData)
@@ -16,15 +16,21 @@ const updateGroup = async (id,groupData) => {
 }
 
 const getAllGroup = async () => {
-    const users = await Group.findAll()
+    const groups = await Group.findAll()
 
-    return users
+    return groups
 }
 
 const getGroupyId = async (id) => {
-    const user = await Group.findById(id)
+    const group = await Group.findById(id)
 
-    return user
+    return group
+
+}
+
+const getGroupByName = async (name) => {
+    const group = await Group.findOne({name});
+    return group;
 
 }
 
@@ -33,6 +39,7 @@ module.exports = {
     getGroupyId,
     createGroup,
     updateGroup,
-    deleteGroup
+    deleteGroup,
+    getGroupByName
 
 }

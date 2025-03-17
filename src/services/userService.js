@@ -1,38 +1,46 @@
-const {getAllUsers,getUserById,createUser,updateUser,deleteUser} = require ('../repositories/user')
+const User = require('../models/user');
+const userRepository = require('../repositories/user');
+const bcryptjs = require('bcryptjs');
 
 const getAllUsers = async () => {
-    const users = await  getAllUsers()
-
-    return users
-    
-}
+    return await userRepository.getAllUsers();
+};
 
 const getUserById = async (id) => {
-  
-}
+    const user = await userRepository.getUserById(id);
+    if (!user) {
+        throw new Error('Usuario no encontrado');
+    }
+    return user;
+};
 
 const createUser = async (userData) => {
-    
-}
-
-const updateUser = async (id,userData) => {
-
-    if (userData)  {
-        throw new Error('User not found')
-
+    if (!userData.name || !userData.email) {
+        throw new Error('El nombre y el correo electrónico son obligatorios');
     }
-    const user = await updateUser(id,userData)
-}
+    const password = userData.password
 
-const deleteUser = async (id,userData) => {
-    
-}
+    // Encriptar la contraseña
+    const salt = bcryptjs.genSaltSync();
+    userData.password = bcryptjs.hashSync( password, salt );
+    return await userRepository.createUser(userData);
+};
 
-module.exports = {
-    getAllUsers,
-    getUserById,
-    createUser,
-    updateUser,
-    deleteUser
+const updateUser = async (id, userData) => {
+    const existingUser = await userRepository.getUserById(id);
+    if (!existingUser) {
+        throw new Error('Usuario no encontrado');
+    }
+    const updatedUser = await userRepository.updateUser(id,userData);
+    return updatedUser;
+};
 
-}
+const deleteUser = async (id) => {
+    const existingUser = await userRepository.getUserById(id);
+    if (!existingUser) {
+        throw new Error('Usuario no encontrado');
+    }
+    return await userRepository.deleteUser(id);
+};
+
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser };

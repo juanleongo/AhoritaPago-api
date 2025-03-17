@@ -25,6 +25,16 @@ const UserSchema = Schema({
         type:Boolean,
         default:true
     },
+    //owen = debo 
+    owe:{
+        type:Number,
+        default:0 
+    },
+    // owen = me deben
+    owes:{
+        type:Number,
+        default:0 
+    },
     google:{
         type:String,
         default:false

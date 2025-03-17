@@ -1,59 +1,84 @@
-const {response}= require('express')
 const groupRepository = require('../repositories/group');
 
-
-const getAllGroups = async (req, res = response) => {
-    try {
-        const groups = await groupService.getAllGroups();
-        res.status(200).json(groups);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+const getAllGroups = async () => {
+    return await groupRepository.getAllGroup();
 };
 
-const getGroupById = async (req, res) => {
+const getGroupById = async (id) => {
+    const group = await groupRepository.getGroupyId(id);
+    if (!group) {
+        throw new Error('Grupo no encontrado');
+    }
+    return group;
+};
+
+const createGroup = async (groupData,userData) => {
+    if (!groupData.name) {
+        throw new Error('El nombre del grupo es obligatorio');
+    }
+    const existingGroup = await groupRepository.getGroupByName(groupData.name);
+    if (existingGroup) {
+        throw new Error('El nombre del grupo ya está en uso');
+    }
+
+    const data = {
+        name: groupData.name,
+        admin: userData.userId
+    }
+    
+    return await groupRepository.createGroup(data);
+};
+
+const updateGroup = async (id, groupData) => {
+    const existingGroup = await groupRepository.getGroupyId(id);
+    if (!existingGroup) {
+        throw new Error('Grupo no encontrado');
+    }
+    return await groupRepository.updateGroup(id, groupData);
+};
+
+const deleteGroup = async (id) => {
+    const existingGroup = await groupRepository.getGroupyId(id);
+    if (!existingGroup) {
+        throw new Error('Grupo no encontrado');
+    }
+    return await groupRepository.deleteGroup(id);
+};
+
+const addMemberToGroup = async (groupId, userId, adminId) => {
     try {
-        const group = await groupService.getGroupById(req.params.id);
+        // 1️⃣ Buscar el grupo por ID
+        const group = await groupRepository.getGroupyId(groupId);
+        
         if (!group) {
-            return res.status(404).json({ message: 'Grupo no encontrado' });
+            throw new Error('El grupo no existe');
         }
-        res.status(200).json(group);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
 
-const createGroup = async (req, res) => {
-    try {
-        const newGroup = await groupService.createGroup(req.body);
-        res.status(201).json(newGroup);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const updateGroup = async (req, res) => {
-    try {
-        const updatedGroup = await groupService.updateGroup(req.params.id, req.body);
-        if (!updatedGroup) {
-            return res.status(404).json({ message: 'Grupo no encontrado' });
+        // 2️⃣ Verificar si el usuario que agrega es el ADMIN del grupo
+        if (group.admin.toString() !== adminId) {
+            throw new Error('Solo el administrador del grupo puede agregar miembros');
         }
-        res.status(200).json(updatedGroup);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
 
-const deleteGroup = async (req, res) => {
-    try {
-        const deleted = await groupService.deleteGroup(req.params.id);
-        if (!deleted) {
-            return res.status(404).json({ message: 'Grupo no encontrado' });
+        // 3️⃣ Verificar si el usuario ya es miembro
+        if (!userId){
+            throw new Error('debe ingresar un usuario'); 
         }
-        res.status(200).json({ message: 'Grupo eliminado correctamente' });
+
+        if (group.members.includes(userId)) {
+           
+            throw new Error('El usuario ya es miembro del grupo');
+        }
+
+        // 4️⃣ Agregar el usuario a la lista de miembros
+        group.members.push(userId);
+
+        // 5️⃣ Guardar los cambios
+        await group.save();
+
+        return { message: 'Usuario agregado al grupo exitosamente', group };
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        throw new Error(error.message);
     }
 };
 
-module.exports = { getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup };
+module.exports = { addMemberToGroup, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup };

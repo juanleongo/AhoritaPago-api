@@ -3,12 +3,13 @@ const {Schema,model  }=require('mongoose')
 const GroupSchema = Schema({
     name : {
         type: String,
-        required: [true, 'el nombre es obligatorio']
+        required: [true, 'el nombre es obligatorio'],
+        unique: true
     }, state:{
         type:Boolean,
         default:true
     },admin:{
-        type:Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref : 'User',
         required: true
     },members: [{
