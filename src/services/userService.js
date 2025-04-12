@@ -15,14 +15,25 @@ const getUserById = async (id) => {
 };
 
 const createUser = async (userData) => {
-    if (!userData.name || !userData.email) {
-        throw new Error('El nombre y el correo electrónico son obligatorios');
-    }
-    const password = userData.password
+    const { name, email, nickname, password } = userData;
 
+    if (!name || !email || !nickname || !password) {
+        throw new Error('El nombre, correo electrónico, nombre de usuario y contraseña son obligatorios');
+    }
+
+    const existingEmail = await userRepository.getUserByEmail(email);
+    if (existingEmail) {
+        throw new Error('El correo electrónico ya está en uso');
+    }
+
+    const existingNickname = await userRepository.getUserByNickName(nickname);
+    if (existingNickname) {
+        throw new Error('El nombre de usuario ya está en uso');
+    }
     // Encriptar la contraseña
     const salt = bcryptjs.genSaltSync();
-    userData.password = bcryptjs.hashSync( password, salt );
+    userData.password = bcryptjs.hashSync(password, salt);
+
     return await userRepository.createUser(userData);
 };
 

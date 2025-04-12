@@ -1,4 +1,6 @@
 const groupRepository = require('../repositories/group');
+const userRepository = require('../repositories/user');
+const {generateRandomCode}= require('../helpers/codeGenerator')
 
 const getAllGroups = async () => {
     return await groupRepository.getAllGroup();
@@ -20,10 +22,20 @@ const createGroup = async (groupData,userData) => {
     if (existingGroup) {
         throw new Error('El nombre del grupo ya está en uso');
     }
+    
+    let code = generateRandomCode() ;
+    const existingCode = await groupRepository.getGroupByCode(code)
+    while (existingCode){
+        code = generateRandomCode()
+        throw new Error('codigo ya esta en uso');
+        
+    }
 
     const data = {
         name: groupData.name,
-        admin: userData.userId
+        admin: userData.userId,
+        code: code,
+        members:userData.userId
     }
     
     return await groupRepository.createGroup(data);
@@ -45,34 +57,34 @@ const deleteGroup = async (id) => {
     return await groupRepository.deleteGroup(id);
 };
 
-const addMemberToGroup = async (groupId, userId, adminId) => {
+const addMemberToGroup = async (groupCode, userNick, adminId) => {
     try {
-        // 1️⃣ Buscar el grupo por ID
-        const group = await groupRepository.getGroupyId(groupId);
+        // Buscar el grupo por code
+        const group = await groupRepository.getGroupByCode(groupCode);
+        const user = await userRepository.getUserByNickName(userNick)
+        
         
         if (!group) {
             throw new Error('El grupo no existe');
         }
 
-        // 2️⃣ Verificar si el usuario que agrega es el ADMIN del grupo
+        // Verificar si el usuario que agrega es el ADMIN del grupo
         if (group.admin.toString() !== adminId) {
             throw new Error('Solo el administrador del grupo puede agregar miembros');
         }
 
-        // 3️⃣ Verificar si el usuario ya es miembro
-        if (!userId){
+        // Verificar si el usuario ya es miembro
+        if (!user._id){
             throw new Error('debe ingresar un usuario'); 
         }
 
-        if (group.members.includes(userId)) {
-           
+        if (group.members.includes(user._id)) {
+        
             throw new Error('El usuario ya es miembro del grupo');
         }
 
-        // 4️⃣ Agregar el usuario a la lista de miembros
-        group.members.push(userId);
-
-        // 5️⃣ Guardar los cambios
+        //  Agregar el usuario a la lista de miembros
+        group.members.push(user._id);
         await group.save();
 
         return { message: 'Usuario agregado al grupo exitosamente', group };

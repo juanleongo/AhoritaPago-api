@@ -16,6 +16,11 @@ const GroupSchema = Schema({
         type: Schema.Types.ObjectId,
         ref: 'User'
     }],
+    code: {
+        type: String,
+        required: true,
+        unique: true
+    },
 })
 
 module.exports = model('Group',GroupSchema)

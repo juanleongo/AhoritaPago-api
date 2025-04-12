@@ -5,6 +5,11 @@ const UserSchema = Schema({
         type:String,
         required: [true,'no envio el nombre']
     },
+    nickname: {
+        type: String,
+        required: [true, 'El nickname es obligatorio'],
+        unique: true 
+    },
     email:{
         type:String,
         required: [true,'no envio el correo'],
@@ -15,11 +20,6 @@ const UserSchema = Schema({
         type:String,
         required: [true,'no envio el password']
 
-    },
-    
-    rol:{
-        type:String,
-        emun:['admin', 'member']
     },
     state:{
         type:Boolean,

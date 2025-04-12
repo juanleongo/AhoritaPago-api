@@ -16,8 +16,7 @@ const login = async (email, password) => {
         throw new Error('Usuario suspendido');
     }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '4h' });
-
+    const token = jwt.sign({ userId: user._id, nick: user.nickname }, process.env.JWT_SECRET, { expiresIn: '4h' });
     return token;
 };
 

@@ -17,7 +17,7 @@ const getGroupById = async (req, res) => {
             return res.status(404).json({ message: 'Grupo no encontrado' });
         }
         res.status(200).json(group);
-    } catch (error) {
+    } catch (error) {sinonimosinonimo
         res.status(500).json({ message: error.message });
     }
 };
@@ -57,10 +57,10 @@ const deleteGroup = async (req, res) => {
 
 const addMember = async (req, res) => {
     try {
-        const { groupId, userId } = req.body;
+        const {groupCode, userNick } = req.body;
         const adminId = req.user.userId; // Obtenemos el ID del usuario autenticado
 
-        const result = await groupService.addMemberToGroup(groupId, userId, adminId);
+        const result = await groupService.addMemberToGroup(groupCode, userNick, adminId);
         res.status(200).json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });

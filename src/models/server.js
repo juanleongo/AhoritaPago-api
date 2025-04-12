@@ -1,10 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const { connection } = require('../db/config');
-
-
-
-
 class Server {
      
     constructor() {
@@ -53,12 +49,13 @@ class Server {
         this.app.use( this.paths.group, require('../routes/group'))
         this.app.use(this.paths.user, require('../routes/user'))
         this.app.use(this.paths.auth, require('../routes/auth'))
+        this.app.use(this.paths.payment, require('../routes/debt'))
         
     }
 
     start() {
         this.app.listen(this.port, () => {
-            console.log(`Example app listening on port ${this.port }!`)
+            console.log(`app listening on port ${this.port }!`)
             
         })
     }

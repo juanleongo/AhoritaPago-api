@@ -34,12 +34,18 @@ const getGroupByName = async (name) => {
 
 }
 
+const getGroupByCode = async (code) => {
+    const group = await Group.findOne({code});
+    return group;
+
+}
 module.exports = {
     getAllGroup,
     getGroupyId,
     createGroup,
     updateGroup,
     deleteGroup,
-    getGroupByName
+    getGroupByName,
+    getGroupByCode
 
 }

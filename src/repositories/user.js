@@ -16,6 +16,12 @@ const getUserByEmail = async (email) => {
     return user
 
 }
+const getUserByNickName = async (nickname) => {
+    const user = await  User.findOne( { nickname })
+    return user
+
+}
+
 
 const createUser = async (userData) => {
     const newUser = await User.create(userData)
@@ -40,6 +46,7 @@ module.exports = {
     createUser,
     updateUser,
     deleteUser,
-    getUserByEmail
+    getUserByEmail,
+    getUserByNickName
 
 }
