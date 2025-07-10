@@ -3,8 +3,7 @@ const {Schema,model  }=require('mongoose')
 const DebtSchema = Schema({
     description: {
         type: String,
-        required: [true, 'la descripcion es obligatorio'],
-        unique: true
+        required: [true, 'la descripcion es obligatorio']
     }, state:{
         type:Boolean,
         default:true
@@ -26,7 +25,17 @@ const DebtSchema = Schema({
     paymentDate: {
         type: Date,
         required: false 
-    }
+    },
+   value: {
+    type: Number,
+    required: [true, 'El valor de la deuda es obligatorio'],
+    min: 0
+  },
+  group: {
+        type: Schema.Types.ObjectId,
+        ref: 'Group',
+        required: true
+    },
 })
 
 module.exports = model('Debt',DebtSchema)

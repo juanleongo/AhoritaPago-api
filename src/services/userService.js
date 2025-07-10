@@ -14,6 +14,15 @@ const getUserById = async (id) => {
     return user;
 };
 
+const getByNickname= async (nickname) => {
+    const user = await userRepository.getUserByNickName(nickname);
+    if (!user) {
+        throw new Error('Usuario no encontrado');
+    }
+    
+    return user;
+};
+
 const createUser = async (userData) => {
     const { name, email, nickname, password } = userData;
 
@@ -26,8 +35,8 @@ const createUser = async (userData) => {
         throw new Error('El correo electrónico ya está en uso');
     }
 
-    const existingNickname = await userRepository.getUserByNickName(nickname);
-    if (existingNickname) {
+    const nicknameUser = await userRepository.getUserByNickName(nickname);
+    if (nicknameUser) {
         throw new Error('El nombre de usuario ya está en uso');
     }
     // Encriptar la contraseña
@@ -37,7 +46,7 @@ const createUser = async (userData) => {
     return await userRepository.createUser(userData);
 };
 
-const updateUser = async (id, userData) => {
+const updateUser = async (id,userData) => {
     const existingUser = await userRepository.getUserById(id);
     if (!existingUser) {
         throw new Error('Usuario no encontrado');
@@ -54,4 +63,4 @@ const deleteUser = async (id) => {
     return await userRepository.deleteUser(id);
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname };

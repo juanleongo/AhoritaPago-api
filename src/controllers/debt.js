@@ -4,7 +4,7 @@ const debtService = require('../services/debtservice');
 // Obtener todas las deudas
 const getAllDebts = async (req, res=response) => {
     try {
-        const debts = await debtService.getAllDebts();
+        const debts = await debtService.getAllDebts(req.user.userId);
         res.json(debts);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -64,10 +64,11 @@ const deleteDebt = async (req, res) => {
 };
 
 // Marcar una deuda como pagada
-const markAsPaid = async (req, res) => {
+const markAsPay = async (req, res) => {
     try {
-        const { id } = req.params;
-        const paidDebt = await debtService.markAsPaid(id);
+        //const { id,group} = req.body;
+        const userId = req.user.userId;
+        const paidDebt = await debtService.markAsPaid(req.params.id, userId);
         if (!paidDebt) {
             return res.status(404).json({ message: 'Deuda no encontrada' });
         }
@@ -83,5 +84,5 @@ module.exports = {
     createDebt,
     updateDebt,
     deleteDebt,
-    markAsPaid
+    markAsPay
 };

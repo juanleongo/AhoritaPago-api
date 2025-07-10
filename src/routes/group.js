@@ -13,7 +13,13 @@ router.post('/', [
     check('name','El nombre es obligatorio').not().isEmpty(),
     validateForms
 ], createGroup);
-router.post('/addMember', authVerify, addMember);
+
+router.post('/addMember',[ 
+    authVerify,
+    check('groupCode','El codigo del grupo es obligatorio').not().isEmpty(),
+    check('userNick','El nombre del usuario es obligatorio').not().isEmpty(),
+    validateForms
+], addMember);
 router.put('/:id', updateGroup)
 router.delete('/:id', deleteGroup)
 

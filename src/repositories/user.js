@@ -28,10 +28,12 @@ const createUser = async (userData) => {
     return newUser
 }
 
-const updateUser = async (id,userData) => {
-    const updateUser = await User.findAndUpdate(id,userData)
-
-    return updateUser
+const updateUser = async (id,updateData) => {
+return await User.findOneAndUpdate(
+    { _id: id },
+    updateData,
+    { new: true, runValidators: true }
+);
 }
 
 const deleteUser = async (id) => {
