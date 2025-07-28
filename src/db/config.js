@@ -3,9 +3,7 @@ const moongoose = require('mongoose')
 const connection= async () =>  {
     
     try {
-        await moongoose.connect('mongodb+srv://leon:leon_200311@cluster0.cjed3bv.mongodb.net/AhoritaPago', {
-            
-           
+        await moongoose.connect(process.env.DATABASE_URL, {      
         })
         console.log('DB Connected')
         
