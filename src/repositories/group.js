@@ -17,16 +17,20 @@ const updateGroup = async (id,groupData) => {
 
 const getAllGroup = async () => {
     const groups = await Group.findAll()
-
     return groups
 }
 
 const getGroupyId = async (id) => {
     const group = await Group.findById(id)
-
     return group
 
 }
+const getAllGroupsByUser= async (id) => {
+    const groups = await Group.find({ members: id })
+    return groups
+}
+   
+
 
 const getGroupByName = async (name) => {
     const group = await Group.findOne({name});
@@ -46,6 +50,7 @@ module.exports = {
     updateGroup,
     deleteGroup,
     getGroupByName,
-    getGroupByCode
+    getGroupByCode,
+    getAllGroupsByUser
 
 }

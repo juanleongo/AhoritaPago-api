@@ -14,6 +14,27 @@ const getGroupById = async (id) => {
     return group;
 };
 
+const getGroupsForUser = async (userId) => {
+    try {
+        const groups = await groupRepository.getAllGroupsByUser(userId);
+
+        // Es una buena práctica manejar el caso en que no se encuentren grupos.
+        if (!groups || groups.length === 0) {
+            return {
+                success: true,
+                data: [],
+                message: 'El usuario no pertenece a ningún grupo.'
+            };
+        }
+
+        return { success: true, data: groups };
+
+    } catch (error) {
+        throw new Error( error);
+        
+    }
+};
+
 const createGroup = async (groupData,userData) => {
     if (!groupData.name) {
         throw new Error('El nombre del grupo es obligatorio');
@@ -93,4 +114,4 @@ const addMemberToGroup = async (groupCode, userNick, adminId) => {
     }
 };
 
-module.exports = { addMemberToGroup, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup };
+module.exports = { addMemberToGroup, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup, getGroupsForUser };

@@ -11,6 +11,11 @@ const getUserById = async (id) => {
     return user
 
 }
+const getUserByToken = async (id) => {
+    const user = await User.findById(id)
+    return user
+
+}
 const getUserByEmail = async (email) => {
     const user = await  User.findOne( { email })
     return user
@@ -49,6 +54,7 @@ module.exports = {
     updateUser,
     deleteUser,
     getUserByEmail,
-    getUserByNickName
+    getUserByNickName,
+    getUserByToken
 
 }

@@ -33,6 +33,20 @@ const getByNickname = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+const getUserByToken= async (req, res) => {
+    try {
+        const user = await userService.getUserByToken(req.user);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 const createUser = async (req,  res= response) => {
     try {
         const newUser = await userService.createUser(req.body);
@@ -68,4 +82,4 @@ const deleteUser = async (req, res) => {
     }
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, getByNickname };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, getByNickname,getUserByToken };

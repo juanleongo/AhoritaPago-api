@@ -2,12 +2,17 @@ const {Router} = require('express')
 const { check } = require('express-validator');
 const { validateForms, authVerify } = require('../middlewares');
 
-const {addMember, getAllGroups ,getGroupById, createGroup,updateGroup,deleteGroup} = require('../controllers/group');
+const {addMember, getAllGroups ,getGroupById, createGroup,updateGroup,deleteGroup, getUserGroups} = require('../controllers/group');
 
 const router = Router()
 
+router.get('/mygroups', [
+    authVerify,
+    validateForms 
+], getUserGroups);
 router.get('/', getAllGroups)
 router.get('/:id', getGroupById)
+
 router.post('/', [ 
     authVerify,
     check('name','El nombre es obligatorio').not().isEmpty(),

@@ -23,6 +23,15 @@ const getByNickname= async (nickname) => {
     return user;
 };
 
+const getUserByToken= async (token) => {
+    const user = await userRepository.getUserByToken(token.userId);
+    if (!user) {
+        throw new Error('Usuario no encontrado');
+    }
+    
+    return user;
+};
+
 const createUser = async (userData) => {
     const { name, email, nickname, password } = userData;
 
@@ -63,4 +72,4 @@ const deleteUser = async (id) => {
     return await userRepository.deleteUser(id);
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken };

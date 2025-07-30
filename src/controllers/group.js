@@ -17,9 +17,23 @@ const getGroupById = async (req, res) => {
             return res.status(404).json({ message: 'Grupo no encontrado' });
         }
         res.status(200).json(group);
-    } catch (error) {sinonimosinonimo
+    } catch (error) {
         res.status(500).json({ message: error.message });
     }
+};
+
+const getUserGroups = async (req = request, res = response) => {
+    // El ID del usuario lo obtenemos del objeto 'req.user',
+    // que es añadido por el middleware 'authVerify' después de validar el JWT.
+
+
+    const result = await groupService.getGroupsForUser(req.user.userId);
+
+    if (!result.success) {
+        return res.status(500).json({ msg: result.error });
+    }
+
+   res.status(200).json(result.data);
 };
 
 const createGroup = async (req, res) => {
@@ -66,4 +80,4 @@ const addMember = async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 };
-module.exports = { addMember, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup };
+module.exports = { addMember, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup, getUserGroups };
