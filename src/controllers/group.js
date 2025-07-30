@@ -23,10 +23,6 @@ const getGroupById = async (req, res) => {
 };
 
 const getUserGroups = async (req = request, res = response) => {
-    // El ID del usuario lo obtenemos del objeto 'req.user',
-    // que es añadido por el middleware 'authVerify' después de validar el JWT.
-
-
     const result = await groupService.getGroupsForUser(req.user.userId);
 
     if (!result.success) {
