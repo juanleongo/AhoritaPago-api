@@ -2,9 +2,14 @@ const {Router} = require('express')
 const { check } = require('express-validator');
 const { validateForms, authVerify } = require('../middlewares');
 
-const {getAllDebts,getDebtById,createDebt,updateDebt,deleteDebt,markAsPay} = require('../controllers/debt');
+const {getAllDebts,getDebtById,createDebt,updateDebt,deleteDebt,markAsPay,getDebtSummary} = require('../controllers/debt');
 
 const router = Router()
+
+router.get('/summary', [
+    authVerify,   
+    validateForms
+], getDebtSummary);
 
 router.get('/',[ 
     authVerify,

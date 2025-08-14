@@ -1,84 +1,137 @@
-const Debt = require("../models/debt");
-
+const debtRepository = require("../repositories/debt");
 const userService = require("../services/userService");
 
-// 🔹 Obtener todas las deudas
 const getAllDebts = async (userId) => {
-   const debts = await Debt.find({   debtor: userId, 
-      state: true  })
-    .populate('debtor', 'name ') // Pobla los datos del deudor (opcional)
-    .populate('creditor', 'name '); // Pobla los datos del acreedor (si lo tienes)
-
-  return debts;
+    return await debtRepository.getAllDebtsForUser(userId);
 };
 
-// 🔹 Obtener una deuda por ID
+
 const getDebtById = async (id) => {
-  return await Debt.findById(id).populate("debtor", "name email");
+    return await debtRepository.getDebtById(id);
 };
 
-// 🔹 Crear una nueva deuda
 const createDebt = async (debtData, creditorData) => {
-  const { description, debtor, value,group } = debtData;
+    // Renombramos 'debtor' a 'debtors' para mayor claridad
+    const { description, debtor: debtors, value, group } = debtData;
 
-  if (!description || !debtor || !value) {
-    throw new Error("Descripción,valor y deudor son obligatorios");
-  }
+    if (!description || !value || !debtors || !Array.isArray(debtors) || debtors.length === 0) {
+ 
 
-  const newDebt = new Debt({
-    description,
-    value,
-    debtor,
-    group,
-    debtDate: Date.now(),
-    creditor: creditorData.userId,
-  });
+        throw new Error("Se requiere una descripción, un valor y una lista de deudores.");
+    }
 
-  userService.updateUser(debtor, { $inc: { owe: value } });
-  userService.updateUser(creditorData.userId, { $inc: { owes: value } });
-  return await newDebt.save();
+    const createdDebts = [];
+    const creditorId = creditorData.userId;
+    // Calculamos el monto total que se le acreditará al acreedor.
+    const totalCreditValue = value * debtors.length;
+
+    // Usamos Promise.all para ejecutar todas las operaciones de forma concurrente,
+    // lo que es más eficiente que un bucle con await.
+    await Promise.all(
+        debtors.map(async (debtorId) => {
+            // Preparamos los datos para la nueva deuda individual
+            const newDebtData = {
+                description,
+                value, // El valor es por persona
+                debtor: [debtorId], // El array de deudores ahora contiene un solo ID
+                group,
+                debtDate: Date.now(),
+                creditor: creditorId,
+            };
+
+            // 1. Creamos el documento de deuda individual en la BD
+            const createdDebt = await debtRepository.createDebt(newDebtData);
+            createdDebts.push(createdDebt);
+
+            // 2. Actualizamos el saldo 'owe' del deudor individual
+            await userService.updateUser(debtorId, { $inc: { owe: value } });
+        })
+    );
+
+    // 3. Actualizamos el saldo 'owes' del acreedor una sola vez con el monto total
+    await userService.updateUser(creditorId, { $inc: { owes: totalCreditValue } });
+
+    // Devolvemos el array con todas las deudas que se crearon
+    return createdDebts;
 };
 
-// 🔹 Actualizar una deuda
+
 const updateDebt = async (id, debtData) => {
-  return await Debt.findByIdAndUpdate(id, debtData, { new: true });
+    return await debtRepository.updateDebt(id, debtData);
 };
 
-// 🔹 Eliminar una deuda
 const deleteDebt = async (id) => {
-  return await Debt.findByIdAndDelete(id);
+    return await debtRepository.deleteDebt(id);
 };
-
-// 🔹 Marcar una deuda como pagada
 
 const markAsPaid = async (id, userId) => {
-  const debt = await Debt.findById(id);
+    const debt = await debtRepository.getDebtById(id);
 
-  if (!debt) {
-    throw new Error("Deuda no encontrada");
-  }
+    if (!debt) {
+        throw new Error("Deuda no encontrada");
+    }
 
-  const isDebtor = debt.debtor.some(
-    (debtorId) => debtorId.toString() === userId
-  );
-  const isCreditor = debt.creditor.toString() === userId;
-  const value = debt.value
+    const isDebtor = debt.debtor.some((debtorId) => debtorId.toString() === userId);
+    const isCreditor = debt.creditor.toString() === userId;
 
+    if (!isDebtor && !isCreditor) {
+        throw new Error("No estás autorizado para marcar esta deuda como pagada");
+    }
 
-  if (!isDebtor && !isCreditor) {
-    throw new Error("No estás autorizado para marcar esta deuda como pagada");
-  }
-  userService.updateUser(debt.creditor.toString(), { $inc: { owes: -value } });
-  userService.updateUser(debt.debtor.toString(), { $inc: { owe: -value } });
-  debt.paymentDate = Date.now();
-  debt.state= false
-  return await debt.save();
+    const value = debt.value;
+    userService.updateUser(debt.creditor.toString(), { $inc: { owes: -value } });
+    
+  
+    debt.debtor.forEach(debtorId => {
+         userService.updateUser(debtorId.toString(), { $inc: { owe: -value } });
+    });
+
+    const updatedDebtData = {
+        paymentDate: Date.now(),
+        state: false
+    };
+
+    return await debtRepository.updateDebt(id, updatedDebtData);
 };
+
+const getDebtSummaryForUser = async (userId) => {
+    const transactions = await debtRepository.findDebtsAndCreditsByUserId(userId);
+
+    const summary = {
+        debts: [],
+        credits: []
+    };
+
+    transactions.forEach(tx => {
+        const formattedTx = {
+            description: tx.description,
+            group: tx.group ? tx.group.name : 'Sin Grupo',
+            date: tx.debtDate,
+            amount: tx.value,
+        };
+
+        const debtorsAsStrings = tx.debtor.map(id => id.toString());
+        const isCreditor = tx.creditor ? tx.creditor.toString() === userId : false;
+
+        if (debtorsAsStrings.includes(userId)) {
+            summary.debts.push(formattedTx);
+        }
+        
+        if (isCreditor) {
+            summary.credits.push(formattedTx);
+        }
+    });
+
+    return summary;
+};
+
+
 module.exports = {
-  getAllDebts,
-  getDebtById,
-  createDebt,
-  updateDebt,
-  deleteDebt,
-  markAsPaid,
+    getAllDebts,
+    getDebtById,
+    createDebt,
+    updateDebt,
+    deleteDebt,
+    markAsPaid,
+    getDebtSummaryForUser 
 };

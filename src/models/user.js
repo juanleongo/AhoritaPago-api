@@ -25,12 +25,12 @@ const UserSchema = Schema({
         type:Boolean,
         default:true
     },
-    //owen = debo 
+    //owe = debo 
     owe:{
         type:Number,
         default:0 
     },
-    // owen = me deben
+    // owes= me deben
     owes:{
         type:Number,
         default:0 

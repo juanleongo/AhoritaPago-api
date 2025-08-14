@@ -78,11 +78,28 @@ const markAsPay = async (req, res) => {
     }
 };
 
+const getDebtSummary = async (req = request, res = response) => {
+    try {
+        // Obtenemos el ID del token JWT
+        const summary = await debtService.getDebtSummaryForUser(req.user.userId);
+
+        res.status(200).json({
+            msg: 'Resumen financiero obtenido con éxito.',
+            summary
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hubo un error al generar el resumen.' });
+    }
+};
+
 module.exports = {
     getAllDebts,
     getDebtById,
     createDebt,
     updateDebt,
     deleteDebt,
-    markAsPay
+    markAsPay,
+    getDebtSummary
 };
