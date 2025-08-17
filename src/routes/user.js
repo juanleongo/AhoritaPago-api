@@ -7,7 +7,10 @@ const router = Router()
 
 //router.get('/', getAllUsers)
 router.get('/nick', getByNickname)
-router.get('/:id', getUserById)
+router.get('/id', [ 
+    authVerify,
+    validateForms
+], getUserById)
 router.get('/', [ 
     authVerify,
     validateForms
