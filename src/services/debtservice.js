@@ -96,6 +96,7 @@ const markAsPaid = async (id, userId) => {
 
 const getDebtSummaryForUser = async (userId) => {
     const transactions = await debtRepository.findDebtsAndCreditsByUserId(userId);
+    
 
     const summary = {
         debts: [],
@@ -103,28 +104,43 @@ const getDebtSummaryForUser = async (userId) => {
     };
 
     transactions.forEach(tx => {
-        const formattedTx = {
-            description: tx.description,
-            group: tx.group ? tx.group.name : 'Sin Grupo',
-            date: tx.debtDate,
-            amount: tx.value,
-        };
+        let involvedUser = 'Usuario Desconocido';
+        
+        // --- INICIO DE LA CORRECCIÓN ---
 
-        const debtorsAsStrings = tx.debtor.map(id => id.toString());
-        const isCreditor = tx.creditor ? tx.creditor.toString() === userId : false;
+        // Accedemos a la propiedad ._id ANTES de convertir a string
+        const isCreditor = tx.creditor ? tx.creditor._id.toString() === userId : false; // <-- CORRECCIÓN
+
+        // Hacemos lo mismo para el array de deudores
+        const debtorsAsStrings = tx.debtor.map(userObj => userObj._id.toString()); // <-- CORRECCIÓN
+        
+        // --- FIN DE LA CORRECCIÓN ---
 
         if (debtorsAsStrings.includes(userId)) {
-            summary.debts.push(formattedTx);
+            involvedUser = tx.creditor ? tx.creditor.name : 'Acreedor no encontrado';
+            summary.debts.push({
+                description: tx.description,
+                group: tx.group ? tx.group.name : 'Sin Grupo',
+                date: tx.debtDate,
+                amount: tx.value,
+                with: involvedUser
+            });
         }
         
         if (isCreditor) {
-            summary.credits.push(formattedTx);
+            involvedUser = tx.debtor.length > 0 ? tx.debtor[0].name : 'Deudor no encontrado';
+            summary.credits.push({
+                description: tx.description,
+                group: tx.group ? tx.group.name : 'Sin Grupo',
+                date: tx.debtDate,
+                amount: tx.value,
+                with: involvedUser
+            });
         }
     });
 
     return summary;
 };
-
 const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
     // 1. Encontrar el grupo usando su código para obtener el ID.
     const group = await groupRepository.getGroupByCode(groupCode);

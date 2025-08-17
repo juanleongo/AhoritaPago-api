@@ -29,8 +29,13 @@ const findDebtsAndCreditsByUserId = async (userId) => {
             { creditor: userId },
             { debtor: userId }
         ],
-        state: true 
-    }).populate('group', 'name');
+        state: true
+    })
+    // ¡Esta es la parte clave!
+    // .populate() reemplaza los IDs de los usuarios con sus documentos completos.
+    .populate('group', 'name')
+    .populate('creditor', 'name nickname') // Traemos nombre y nickname del acreedor
+    .populate('debtor', 'name nickname');   // Traemos nombre y nickname del deudor
 };
 
 const findDebtsForUserInGroup = async (userId, groupId) => {
