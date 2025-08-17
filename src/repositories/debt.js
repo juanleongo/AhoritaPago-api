@@ -33,7 +33,16 @@ const findDebtsAndCreditsByUserId = async (userId) => {
     }).populate('group', 'name');
 };
 
-
+const findDebtsForUserInGroup = async (userId, groupId) => {
+    return await Debt.find({
+        group: groupId,
+        state: true,
+        $or: [
+            { creditor: userId },
+            { debtor: userId }
+        ]
+    }).populate('creditor', 'name nickname').populate('debtor', 'name nickname'); // Traemos más info útil
+};
 module.exports = {
     createDebt,
     deleteDebt,
@@ -41,4 +50,5 @@ module.exports = {
     getAllDebtsForUser,
     getDebtById,
     findDebtsAndCreditsByUserId,
+    findDebtsForUserInGroup
 };

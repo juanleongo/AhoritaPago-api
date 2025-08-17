@@ -94,6 +94,26 @@ const getDebtSummary = async (req = request, res = response) => {
     }
 };
 
+const getDebtsInGroup = async (req = request, res = response) => {
+    try {
+        const { groupCode } = req.params;
+ // Extraemos el código de la URL
+        const userId = req.user.userId;   // Extraemos el ID del usuario del token
+
+        const debts = await debtService.getDebtsForUserInGroupByCode(userId, groupCode);
+
+        res.status(200).json({
+            msg: `Deudas encontradas en el grupo ${groupCode}`,
+            count: debts.length,
+            debts
+        });
+
+    } catch (error) {
+ 
+        res.status(404).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getAllDebts,
     getDebtById,
@@ -101,5 +121,6 @@ module.exports = {
     updateDebt,
     deleteDebt,
     markAsPay,
-    getDebtSummary
+    getDebtSummary,
+    getDebtsInGroup
 };

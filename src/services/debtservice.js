@@ -1,5 +1,6 @@
 const debtRepository = require("../repositories/debt");
 const userService = require("../services/userService");
+const groupRepository = require("../repositories/group");
 
 const getAllDebts = async (userId) => {
     return await debtRepository.getAllDebtsForUser(userId);
@@ -15,7 +16,6 @@ const createDebt = async (debtData, creditorData) => {
     const { description, debtor: debtors, value, group } = debtData;
 
     if (!description || !value || !debtors || !Array.isArray(debtors) || debtors.length === 0) {
- 
 
         throw new Error("Se requiere una descripción, un valor y una lista de deudores.");
     }
@@ -125,6 +125,26 @@ const getDebtSummaryForUser = async (userId) => {
     return summary;
 };
 
+const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
+    // 1. Encontrar el grupo usando su código para obtener el ID.
+    const group = await groupRepository.getGroupByCode(groupCode);
+
+    if (!group) {
+        throw new Error("El grupo con ese código no fue encontrado.");
+    }
+
+    // Opcional: Verificar si el usuario es miembro del grupo antes de buscar deudas.
+    const isMember = group.members.some(memberId => memberId.toString() === userId);
+    if (!isMember) {
+        throw new Error("No eres miembro de este grupo.");
+    }
+
+    // 2. Usar el ID del grupo para buscar las deudas.
+    const debtsInGroup = await debtRepository.findDebtsForUserInGroup(userId, group._id);
+
+    return debtsInGroup;
+};
+
 
 module.exports = {
     getAllDebts,
@@ -133,5 +153,6 @@ module.exports = {
     updateDebt,
     deleteDebt,
     markAsPaid,
-    getDebtSummaryForUser 
+    getDebtSummaryForUser,
+    getDebtsForUserInGroupByCode
 };
