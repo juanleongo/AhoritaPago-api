@@ -96,7 +96,7 @@ const getDebtSummary = async (req = request, res = response) => {
 
 const getDebtsInGroup = async (req = request, res = response) => {
     try {
-        const groupCode  = req.body.groupCode; // Extraemos el código del cuerpo de la solicitud
+        const groupCode  = req.params.groupCode; // Extraemos el código del cuerpo de la solicitud
         const userId = req.user.userId;   // Extraemos el ID del usuario del token
 
         const debts = await debtService.getDebtsForUserInGroupByCode(userId, groupCode);

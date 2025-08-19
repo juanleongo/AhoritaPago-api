@@ -22,7 +22,7 @@ router.get('/summary', [
     validateForms
 ], getDebtSummary);
 
-router.get('/group/', [
+router.get('/group/:groupCode', [
     authVerify,
     validateForms
 ], getDebtsInGroup);
