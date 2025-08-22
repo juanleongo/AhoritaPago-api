@@ -23,6 +23,17 @@ const getByNickname= async (nickname) => {
     return user;
 };
 
+const searchUsersByNickname = async (searchTerm) => {
+    if (!searchTerm || searchTerm.trim().length < 2) {
+        // Evitamos búsquedas vacías o muy cortas para no sobrecargar la BD.
+        throw new Error('El término de búsqueda debe tener al menos 2 caracteres.');
+    }
+
+    const users = await userRepository.findUsersByNicknameSearch(searchTerm);
+    return users;
+};
+
+
 const getUserByToken= async (token) => {
     const user = await userRepository.getUserByToken(token.userId);
     if (!user) {
@@ -72,4 +83,4 @@ const deleteUser = async (id) => {
     return await userRepository.deleteUser(id);
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken, searchUsersByNickname };

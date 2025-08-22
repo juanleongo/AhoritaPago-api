@@ -47,6 +47,15 @@ const deleteUser = async (id) => {
     return delUser
 }
 
+const findUsersByNicknameSearch = async (searchTerm) => {
+
+    const regex = new RegExp(searchTerm, 'i');
+
+    const users = await User.find({ nickname: regex }).select('nickname name');
+    
+    return users;
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
@@ -55,6 +64,7 @@ module.exports = {
     deleteUser,
     getUserByEmail,
     getUserByNickName,
-    getUserByToken
+    getUserByToken,
+    findUsersByNicknameSearch
 
 }

@@ -47,6 +47,21 @@ const getUserByToken= async (req, res) => {
     }
 };
 
+const searchUsers = async (req = request, res = response) => {
+    try {
+        const { searchTerm } = req.params; // Extraemos el término de la URL
+        const users = await userService.searchUsersByNickname(searchTerm);
+
+        res.status(200).json({
+            msg: `Resultados de la búsqueda para '${searchTerm}'`,
+            results: users
+        });
+
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
 const createUser = async (req,  res= response) => {
     try {
         const newUser = await userService.createUser(req.body);
@@ -82,4 +97,4 @@ const deleteUser = async (req, res) => {
     }
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, getByNickname,getUserByToken };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, getByNickname,getUserByToken, searchUsers };
