@@ -12,13 +12,13 @@ const getAllUsers = async (req, res= response) => {
 
 const getUserById = async (req, res) => {
     try {
-        const user = await userService.getUserById(req.params.id);
+        const user = await userService.getUserById(req.params.id, req.user.userId);
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
         res.status(200).json(user);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
 const getByNickname = async (req, res) => {
@@ -75,25 +75,25 @@ const createUser = async (req,  res= response) => {
 
 const updateUser = async (req, res) => {
     try {
-        const updatedUser = await userService.updateUser(req.params.id, req.body);
+        const updatedUser = await userService.updateUser(req.params.id, req.body, req.user.userId);
         if (!updatedUser) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
         res.status(200).json(updatedUser);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
 
 const deleteUser = async (req, res) => {
     try {
-        const deleted = await userService.deleteUser(req.params.id);
+        const deleted = await userService.deleteUser(req.params.id, req.user.userId);
         if (!deleted) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
         res.status(200).json({ message: 'Usuario eliminado correctamente' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(error.statusCode || 500).json({ message: error.message });
     }
 };
 

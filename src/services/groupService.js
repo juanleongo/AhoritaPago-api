@@ -1,16 +1,30 @@
 const groupRepository = require('../repositories/group');
 const userRepository = require('../repositories/user');
 const {generateRandomCode}= require('../helpers/codeGenerator')
+const { createHttpError } = require('../helpers/httpError');
 
-const getAllGroups = async () => {
-    return await groupRepository.getAllGroup();
+const isSameId = (firstId, secondId) => (
+    firstId && secondId && firstId.toString() === secondId.toString()
+);
+
+const isGroupMember = (group, userId) => (
+    group.members.some(memberId => isSameId(memberId, userId))
+);
+
+const getAllGroups = async (userId) => {
+    return await groupRepository.getAllGroupsByUser(userId);
 };
 
-const getGroupById = async (id) => {
+const getGroupById = async (id, userId) => {
     const group = await groupRepository.getGroupyId(id);
     if (!group) {
-        throw new Error('Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado');
     }
+
+    if (!isGroupMember(group, userId)) {
+        throw createHttpError(403, 'No tienes permiso para consultar este grupo');
+    }
+
     return group;
 };
 
@@ -62,56 +76,61 @@ const createGroup = async (groupData,userData) => {
     return await groupRepository.createGroup(data);
 };
 
-const updateGroup = async (id, groupData) => {
+const updateGroup = async (id, groupData, authenticatedUserId) => {
     const existingGroup = await groupRepository.getGroupyId(id);
     if (!existingGroup) {
-        throw new Error('Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado');
     }
-    return await groupRepository.updateGroup(id, groupData);
+
+    if (!isSameId(existingGroup.admin, authenticatedUserId)) {
+        throw createHttpError(403, 'Solo el administrador puede modificar el grupo');
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(groupData, 'name')) {
+        throw createHttpError(400, 'Solo se permite actualizar el nombre del grupo');
+    }
+
+    return await groupRepository.updateGroup(id, { name: groupData.name });
 };
 
-const deleteGroup = async (id) => {
+const deleteGroup = async (id, authenticatedUserId) => {
     const existingGroup = await groupRepository.getGroupyId(id);
     if (!existingGroup) {
-        throw new Error('Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado');
     }
+
+    if (!isSameId(existingGroup.admin, authenticatedUserId)) {
+        throw createHttpError(403, 'Solo el administrador puede eliminar el grupo');
+    }
+
     return await groupRepository.deleteGroup(id);
 };
 
-const addMemberToGroup = async (groupCode, userNick, adminId) => {
-    try {
-        // Buscar el grupo por code
-        const group = await groupRepository.getGroupByCode(groupCode);
-        const user = await userRepository.getUserByNickName(userNick)
-        
-        
-        if (!group) {
-            throw new Error('El grupo no existe');
-        }
+const addMemberToGroup = async (groupCode, userNick, requesterId) => {
+    const group = await groupRepository.getGroupByCode(groupCode);
 
-        // Verificar si el usuario que agrega es el ADMIN del grupo
-        if (group.admin.toString() !== adminId) {
-            throw new Error('Solo el administrador del grupo puede agregar miembros');
-        }
-
-        // Verificar si el usuario ya es miembro
-        if (!user._id){
-            throw new Error('debe ingresar un usuario'); 
-        }
-
-        if (group.members.includes(user._id)) {
-        
-            throw new Error('El usuario ya es miembro del grupo');
-        }
-
-        //  Agregar el usuario a la lista de miembros
-        group.members.push(user._id);
-        await group.save();
-
-        return { message: 'Usuario agregado al grupo exitosamente', group };
-    } catch (error) {
-        throw new Error(error.message);
+    if (!group) {
+        throw createHttpError(404, 'El grupo no existe');
     }
+
+    if (!isGroupMember(group, requesterId)) {
+        throw createHttpError(403, 'Solo un integrante del grupo puede agregar miembros');
+    }
+
+    const user = await userRepository.getUserByNickName(userNick);
+
+    if (!user) {
+        throw createHttpError(404, 'El usuario no existe');
+    }
+
+    if (isGroupMember(group, user._id)) {
+        throw createHttpError(400, 'El usuario ya es miembro del grupo');
+    }
+
+    group.members.push(user._id);
+    await group.save();
+
+    return { message: 'Usuario agregado al grupo exitosamente', group };
 };
 
 module.exports = { addMemberToGroup, getAllGroups, getGroupById, createGroup, updateGroup, deleteGroup, getGroupsForUser };

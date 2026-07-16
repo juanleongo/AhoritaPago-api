@@ -22,7 +22,7 @@ const getUserByEmail = async (email) => {
 
 }
 const getUserByNickName = async (nickname) => {
-    const user = await  User.findOne( { nickname })
+    const user = await  User.findOne( { nickname }).select('nickname name')
     return user
 
 }
@@ -42,7 +42,7 @@ return await User.findOneAndUpdate(
 }
 
 const deleteUser = async (id) => {
-    const  delUser = await Usuario.findByIdAndUpdate(id,{state : false})
+    const  delUser = await User.findByIdAndUpdate(id,{state : false}, { new: true })
 
     return delUser
 }

@@ -10,7 +10,7 @@ const deleteDebt = async (id) => {
 };
 
 const updateDebt = async (id, debtData) => {
-    return await Debt.findByIdAndUpdate(id, debtData, { new: true });
+    return await Debt.findByIdAndUpdate(id, debtData, { new: true, runValidators: true });
 };
 
 const getAllDebtsForUser = async (userId) => {

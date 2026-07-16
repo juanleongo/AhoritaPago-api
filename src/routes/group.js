@@ -6,21 +6,21 @@ const {addMember, getAllGroups ,getGroupById, createGroup,updateGroup,deleteGrou
 
 const router = Router()
 
+// Todas las operaciones de grupos requieren un JWT válido.
+router.use(authVerify)
+
 router.get('/mygroups', [
-    authVerify,
     validateForms 
 ], getUserGroups);
 router.get('/', getAllGroups)
 router.get('/:id', getGroupById)
 
 router.post('/', [ 
-    authVerify,
     check('name','El nombre es obligatorio').not().isEmpty(),
     validateForms
 ], createGroup);
 
 router.post('/addMember',[ 
-    authVerify,
     check('groupCode','El codigo del grupo es obligatorio').not().isEmpty(),
     check('userNick','El nombre del usuario es obligatorio').not().isEmpty(),
     validateForms

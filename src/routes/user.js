@@ -5,20 +5,21 @@ const {getAllUsers,getUserById, createUser,updateUser,deleteUser,getByNickname,g
 
 const router = Router()
 
+// El registro es la única operación pública de usuarios.
+router.post('/', createUser)
+
+// Todas las rutas declaradas después de este punto requieren un JWT válido.
+router.use(authVerify)
+
 //router.get('/', getAllUsers)
 router.get('/nick', getByNickname)
 router.get('/:id', [ 
-    authVerify,
     validateForms
 ], getUserById)
-router.get('/search/:searchTerm', [
-    authVerify // Asegura que solo usuarios logueados puedan buscar
-], searchUsers);
+router.get('/search/:searchTerm', searchUsers);
 router.get('/', [ 
-    authVerify,
     validateForms
 ], getUserByToken);
-router.post('/', createUser)
 router.put('/:id', updateUser)
 router.delete('/:id', deleteUser)
 

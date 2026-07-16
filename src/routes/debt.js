@@ -16,14 +16,14 @@ const {
 
 const router = Router();
 
+// Todas las operaciones de deudas y pagos requieren un JWT válido.
+router.use(authVerify);
 
 router.get('/summary', [
-    authVerify,
     validateForms
 ], getDebtSummary);
 
 router.get('/group/:groupCode', [
-    authVerify,
     validateForms
 ], getDebtsInGroup);
 
@@ -37,23 +37,19 @@ router.get('/:id', getDebtById);
 // --- Resto de las rutas ---
 
 router.get('/', [ 
-    authVerify,
     validateForms
 ], getAllDebts);
 
 router.post('/', [ 
-    authVerify,
     check('description','la descripcion es obligatoria').not().isEmpty(),
     validateForms
 ], createDebt);
 
 router.put('/:id',[ 
-    authVerify,
     validateForms
 ], updateDebt);
 
 router.put('/pay/:id',[ 
-    authVerify,
     validateForms
 ], markAsPay);
 

@@ -1,15 +1,24 @@
 
 const userRepository = require('../repositories/user');
 const bcryptjs = require('bcryptjs');
+const { createHttpError } = require('../helpers/httpError');
+
+const isSameUser = (userId, authenticatedUserId) => (
+    userId.toString() === authenticatedUserId.toString()
+);
 
 const getAllUsers = async () => {
     return await userRepository.getAllUsers();
 };
 
-const getUserById = async (id) => {
+const getUserById = async (id, authenticatedUserId) => {
+    if (!isSameUser(id, authenticatedUserId)) {
+        throw createHttpError(403, 'No tienes permiso para consultar este usuario');
+    }
+
     const user = await userRepository.getUserById(id);
     if (!user) {
-        throw new Error('Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado');
     }
     return user;
 };
@@ -66,21 +75,64 @@ const createUser = async (userData) => {
     return await userRepository.createUser(userData);
 };
 
-const updateUser = async (id,userData) => {
+const updateUser = async (id, userData, authenticatedUserId) => {
+    if (!isSameUser(id, authenticatedUserId)) {
+        throw createHttpError(403, 'No tienes permiso para modificar este usuario');
+    }
+
     const existingUser = await userRepository.getUserById(id);
     if (!existingUser) {
-        throw new Error('Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado');
     }
-    const updatedUser = await userRepository.updateUser(id,userData);
-    return updatedUser;
+
+    const allowedFields = ['name', 'nickname', 'email'];
+    const allowedData = {};
+
+    allowedFields.forEach(field => {
+        if (Object.prototype.hasOwnProperty.call(userData, field)) {
+            allowedData[field] = userData[field];
+        }
+    });
+
+    if (Object.keys(allowedData).length === 0) {
+        throw createHttpError(400, 'No se enviaron campos permitidos para actualizar');
+    }
+
+    return await userRepository.updateUser(id, allowedData);
 };
 
-const deleteUser = async (id) => {
+const deleteUser = async (id, authenticatedUserId) => {
+    if (!isSameUser(id, authenticatedUserId)) {
+        throw createHttpError(403, 'No tienes permiso para eliminar este usuario');
+    }
+
     const existingUser = await userRepository.getUserById(id);
     if (!existingUser) {
-        throw new Error('Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado');
     }
     return await userRepository.deleteUser(id);
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken, searchUsersByNickname };
+const incrementUserBalances = async (id, balanceChanges) => {
+    const existingUser = await userRepository.getUserById(id);
+    if (!existingUser) {
+        throw createHttpError(404, 'Usuario no encontrado');
+    }
+
+    const allowedBalances = ['owe', 'owes'];
+    const safeChanges = {};
+
+    allowedBalances.forEach(field => {
+        if (Number.isFinite(balanceChanges[field])) {
+            safeChanges[field] = balanceChanges[field];
+        }
+    });
+
+    if (Object.keys(safeChanges).length === 0) {
+        throw createHttpError(400, 'No se enviaron cambios de saldo válidos');
+    }
+
+    return await userRepository.updateUser(id, { $inc: safeChanges });
+};
+
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken, searchUsersByNickname, incrementUserBalances };

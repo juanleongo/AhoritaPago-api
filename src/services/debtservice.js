@@ -1,34 +1,98 @@
 const debtRepository = require("../repositories/debt");
 const userService = require("../services/userService");
 const groupRepository = require("../repositories/group");
+const { createHttpError } = require("../helpers/httpError");
+
+const toIdString = (value) => {
+    if (!value) return null;
+    return (value._id || value).toString();
+};
+
+const isDebtCreditor = (debt, userId) => (
+    toIdString(debt.creditor) === userId.toString()
+);
+
+const isDebtDebtor = (debt, userId) => (
+    debt.debtor.some(debtorId => toIdString(debtorId) === userId.toString())
+);
+
+const getExistingDebt = async (id) => {
+    const debt = await debtRepository.getDebtById(id);
+
+    if (!debt) {
+        throw createHttpError(404, "Deuda no encontrada");
+    }
+
+    return debt;
+};
 
 const getAllDebts = async (userId) => {
     return await debtRepository.getAllDebtsForUser(userId);
 };
 
 
-const getDebtById = async (id) => {
-    return await debtRepository.getDebtById(id);
+const getDebtById = async (id, userId) => {
+    const debt = await getExistingDebt(id);
+
+    if (!isDebtCreditor(debt, userId) && !isDebtDebtor(debt, userId)) {
+        throw createHttpError(403, "No tienes permiso para consultar esta deuda");
+    }
+
+    return debt;
 };
 
 const createDebt = async (debtData, creditorData) => {
     // Renombramos 'debtor' a 'debtors' para mayor claridad
     const { description, debtor: debtors, value, group } = debtData;
 
-    if (!description || !value || !debtors || !Array.isArray(debtors) || debtors.length === 0) {
+    if (!description || !value || !group || !debtors || !Array.isArray(debtors) || debtors.length === 0) {
 
-        throw new Error("Se requiere una descripción, un valor y una lista de deudores.");
+        throw createHttpError(400, "Se requiere una descripción, un valor, un grupo y una lista de deudores.");
+    }
+
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        throw createHttpError(400, "El valor de la deuda debe ser un número mayor que cero.");
     }
 
     const createdDebts = [];
     const creditorId = creditorData.userId;
+    const targetGroup = await groupRepository.getGroupyId(group);
+
+    if (!targetGroup || !targetGroup.state) {
+        throw createHttpError(404, "Grupo no encontrado");
+    }
+
+    const memberIds = new Set(targetGroup.members.map(toIdString));
+
+    if (!memberIds.has(creditorId.toString())) {
+        throw createHttpError(403, "No puedes crear deudas en un grupo al que no perteneces");
+    }
+
+    if (debtors.some(debtorId => !debtorId)) {
+        throw createHttpError(400, "La lista de deudores contiene identificadores inválidos");
+    }
+
+    const uniqueDebtorIds = [...new Set(debtors.map(debtorId => debtorId.toString()))];
+
+    if (uniqueDebtorIds.length !== debtors.length) {
+        throw createHttpError(400, "La lista de deudores contiene usuarios repetidos");
+    }
+
+    if (uniqueDebtorIds.includes(creditorId.toString())) {
+        throw createHttpError(400, "El acreedor no puede registrarse como deudor");
+    }
+
+    if (uniqueDebtorIds.some(debtorId => !memberIds.has(debtorId))) {
+        throw createHttpError(403, "Todos los deudores deben pertenecer al grupo");
+    }
+
     // Calculamos el monto total que se le acreditará al acreedor.
-    const totalCreditValue = value * debtors.length;
+    const totalCreditValue = value * uniqueDebtorIds.length;
 
     // Usamos Promise.all para ejecutar todas las operaciones de forma concurrente,
     // lo que es más eficiente que un bucle con await.
     await Promise.all(
-        debtors.map(async (debtorId) => {
+        uniqueDebtorIds.map(async (debtorId) => {
             // Preparamos los datos para la nueva deuda individual
             const newDebtData = {
                 description,
@@ -44,47 +108,68 @@ const createDebt = async (debtData, creditorData) => {
             createdDebts.push(createdDebt);
 
             // 2. Actualizamos el saldo 'owe' del deudor individual
-            await userService.updateUser(debtorId, { $inc: { owe: value } });
+            await userService.incrementUserBalances(debtorId, { owe: value });
         })
     );
 
     // 3. Actualizamos el saldo 'owes' del acreedor una sola vez con el monto total
-    await userService.updateUser(creditorId, { $inc: { owes: totalCreditValue } });
+    await userService.incrementUserBalances(creditorId, { owes: totalCreditValue });
 
     // Devolvemos el array con todas las deudas que se crearon
     return createdDebts;
 };
 
 
-const updateDebt = async (id, debtData) => {
-    return await debtRepository.updateDebt(id, debtData);
+const updateDebt = async (id, debtData, userId) => {
+    const debt = await getExistingDebt(id);
+
+    if (!isDebtCreditor(debt, userId)) {
+        throw createHttpError(403, "Solo el acreedor puede modificar esta deuda");
+    }
+
+    if (!debt.state) {
+        throw createHttpError(400, "No se puede modificar una deuda pagada");
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(debtData, 'description')) {
+        throw createHttpError(400, "Solo se permite actualizar la descripción de la deuda");
+    }
+
+    return await debtRepository.updateDebt(id, { description: debtData.description });
 };
 
-const deleteDebt = async (id) => {
+const deleteDebt = async (id, userId) => {
+    const debt = await getExistingDebt(id);
+
+    if (!isDebtCreditor(debt, userId)) {
+        throw createHttpError(403, "Solo el acreedor puede eliminar esta deuda");
+    }
+
     return await debtRepository.deleteDebt(id);
 };
 
 const markAsPaid = async (id, userId) => {
-    const debt = await debtRepository.getDebtById(id);
-
-    if (!debt) {
-        throw new Error("Deuda no encontrada");
-    }
-
-    const isDebtor = debt.debtor.some((debtorId) => debtorId.toString() === userId);
-    const isCreditor = debt.creditor.toString() === userId;
+    const debt = await getExistingDebt(id);
+    const isDebtor = isDebtDebtor(debt, userId);
+    const isCreditor = isDebtCreditor(debt, userId);
 
     if (!isDebtor && !isCreditor) {
-        throw new Error("No estás autorizado para marcar esta deuda como pagada");
+        throw createHttpError(403, "No estás autorizado para marcar esta deuda como pagada");
+    }
+
+    if (!debt.state) {
+        throw createHttpError(400, "La deuda ya fue marcada como pagada");
     }
 
     const value = debt.value;
-    userService.updateUser(debt.creditor.toString(), { $inc: { owes: -value } });
-    
-  
-    debt.debtor.forEach(debtorId => {
-         userService.updateUser(debtorId.toString(), { $inc: { owe: -value } });
-    });
+    const balanceUpdates = [
+        userService.incrementUserBalances(toIdString(debt.creditor), { owes: -value }),
+        ...debt.debtor.map(debtorId => (
+            userService.incrementUserBalances(toIdString(debtorId), { owe: -value })
+        ))
+    ];
+
+    await Promise.all(balanceUpdates);
 
     const updatedDebtData = {
         paymentDate: Date.now(),
@@ -146,13 +231,13 @@ const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
     const group = await groupRepository.getGroupByCode(groupCode);
 
     if (!group) {
-        throw new Error("El grupo con ese código no fue encontrado.");
+        throw createHttpError(404, "El grupo con ese código no fue encontrado.");
     }
 
     // Opcional: Verificar si el usuario es miembro del grupo antes de buscar deudas.
     const isMember = group.members.some(memberId => memberId.toString() === userId);
     if (!isMember) {
-        throw new Error("No eres miembro de este grupo.");
+        throw createHttpError(403, "No eres miembro de este grupo.");
     }
 
     // 2. Usar el ID del grupo para buscar las deudas.

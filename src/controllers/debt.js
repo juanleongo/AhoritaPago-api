@@ -14,14 +14,13 @@ const getAllDebts = async (req, res=response) => {
 // Obtener una deuda por ID
 const getDebtById = async (req, res) => {
     try {
-    
-        const debt = await debtService.getDebtById(req.params.id);
+        const debt = await debtService.getDebtById(req.params.id, req.user.userId);
         if (!debt) {
             return res.status(404).json({ message: 'Deuda no encontrada' });
         }
         res.status(200).json(debt);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -31,7 +30,7 @@ const createDebt = async (req, res) => {
         const debt = await debtService.createDebt(req.body,req.user);
         res.status(201).json(debt);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(error.statusCode || 400).json({ error: error.message });
     }
 };
 
@@ -39,13 +38,13 @@ const createDebt = async (req, res) => {
 const updateDebt = async (req, res) => {
     try {
         const { id } = req.params;
-        const updated = await debtService.updateDebt(id, req.body);
+        const updated = await debtService.updateDebt(id, req.body, req.user.userId);
         if (!updated) {
             return res.status(404).json({ message: 'Deuda no encontrada' });
         }
         res.json(updated);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -53,13 +52,13 @@ const updateDebt = async (req, res) => {
 const deleteDebt = async (req, res) => {
     try {
         const { id } = req.params;
-        const deleted = await debtService.deleteDebt(id);
+        const deleted = await debtService.deleteDebt(id, req.user.userId);
         if (!deleted) {
             return res.status(404).json({ message: 'Deuda no encontrada' });
         }
         res.json({ message: 'Deuda eliminada correctamente' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -74,7 +73,7 @@ const markAsPay = async (req, res) => {
         }
         res.json({ message: 'Deuda marcada como pagada', debt: paidDebt });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 };
 
@@ -108,8 +107,7 @@ const getDebtsInGroup = async (req = request, res = response) => {
         });
 
     } catch (error) {
- 
-        res.status(404).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 };
 

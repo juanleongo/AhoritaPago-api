@@ -6,17 +6,17 @@ const createGroup = async (groupData) => {
 }
 
 const deleteGroup = async (id) => {
-    const  delGroup = await Group.findByIdAndUpdate(id,{state : false})
+    const  delGroup = await Group.findByIdAndUpdate(id,{state : false}, { new: true })
     return delGroup
 }
 
 const updateGroup = async (id,groupData) => {
-    const updateGroup = await Group.findAndUpdate(id,groupData)
+    const updateGroup = await Group.findByIdAndUpdate(id, groupData, { new: true, runValidators: true })
     return updateGroup
 }
 
 const getAllGroup = async () => {
-    const groups = await Group.findAll()
+    const groups = await Group.find({ state: true })
     return groups
 }
 
@@ -26,7 +26,7 @@ const getGroupyId = async (id) => {
 
 }
 const getAllGroupsByUser= async (id) => {
-    const groups = await Group.find({ members: id })
+    const groups = await Group.find({ members: id, state: true })
     return groups
 }
    
