@@ -4,7 +4,7 @@ const GroupSchema = Schema({
     name : {
         type: String,
         required: [true, 'el nombre es obligatorio'],
-        unique: true
+        unique: false
     }, state:{
         type:Boolean,
         default:true

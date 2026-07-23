@@ -1,13 +1,13 @@
 const User  = require('../models/user')
 
 const getAllUsers = async () => {
-    const users = await User.findAll()
+    const users = await User.find({ state: true })
 
     return users
 }
 
-const getUserById = async (id) => {
-    const user = await User.findById(id)
+const getUserById = async (id, session = null) => {
+    const user = await User.findById(id).session(session)
     return user
 
 }
@@ -33,11 +33,11 @@ const createUser = async (userData) => {
     return newUser
 }
 
-const updateUser = async (id,updateData) => {
+const updateUser = async (id, updateData, session = null) => {
 return await User.findOneAndUpdate(
     { _id: id },
     updateData,
-    { new: true, runValidators: true }
+    { new: true, runValidators: true, session }
 );
 }
 

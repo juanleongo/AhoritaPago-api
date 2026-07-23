@@ -2,6 +2,7 @@ const debtRepository = require("../repositories/debt");
 const userService = require("../services/userService");
 const groupRepository = require("../repositories/group");
 const { createHttpError } = require("../helpers/httpError");
+const mongoose = require("mongoose");
 
 const toIdString = (value) => {
     if (!value) return null;
@@ -16,8 +17,8 @@ const isDebtDebtor = (debt, userId) => (
     debt.debtor.some(debtorId => toIdString(debtorId) === userId.toString())
 );
 
-const getExistingDebt = async (id) => {
-    const debt = await debtRepository.getDebtById(id);
+const getExistingDebt = async (id, session = null) => {
+    const debt = await debtRepository.getDebtById(id, session);
 
     if (!debt) {
         throw createHttpError(404, "Deuda no encontrada");
@@ -54,19 +55,7 @@ const createDebt = async (debtData, creditorData) => {
         throw createHttpError(400, "El valor de la deuda debe ser un número mayor que cero.");
     }
 
-    const createdDebts = [];
     const creditorId = creditorData.userId;
-    const targetGroup = await groupRepository.getGroupyId(group);
-
-    if (!targetGroup || !targetGroup.state) {
-        throw createHttpError(404, "Grupo no encontrado");
-    }
-
-    const memberIds = new Set(targetGroup.members.map(toIdString));
-
-    if (!memberIds.has(creditorId.toString())) {
-        throw createHttpError(403, "No puedes crear deudas en un grupo al que no perteneces");
-    }
 
     if (debtors.some(debtorId => !debtorId)) {
         throw createHttpError(400, "La lista de deudores contiene identificadores inválidos");
@@ -82,40 +71,64 @@ const createDebt = async (debtData, creditorData) => {
         throw createHttpError(400, "El acreedor no puede registrarse como deudor");
     }
 
-    if (uniqueDebtorIds.some(debtorId => !memberIds.has(debtorId))) {
-        throw createHttpError(403, "Todos los deudores deben pertenecer al grupo");
+    const totalCreditValue = value * uniqueDebtorIds.length;
+    const session = await mongoose.startSession();
+    let createdDebts = [];
+
+    try {
+        await session.withTransaction(async () => {
+            const targetGroup = await groupRepository.getGroupyId(group, session);
+
+            if (!targetGroup || !targetGroup.state) {
+                throw createHttpError(404, "Grupo no encontrado");
+            }
+
+            const memberIds = new Set(targetGroup.members.map(toIdString));
+
+            if (!memberIds.has(creditorId.toString())) {
+                throw createHttpError(403, "No puedes crear deudas en un grupo al que no perteneces");
+            }
+
+            if (uniqueDebtorIds.some(debtorId => !memberIds.has(debtorId))) {
+                throw createHttpError(403, "Todos los deudores deben pertenecer al grupo");
+            }
+
+            const transactionDebts = [];
+
+            // Las operaciones se ejecutan en serie porque una misma sesión de
+            // MongoDB no admite operaciones paralelas dentro de una transacción.
+            for (const debtorId of uniqueDebtorIds) {
+                const newDebtData = {
+                    description,
+                    value,
+                    debtor: [debtorId],
+                    group,
+                    debtDate: Date.now(),
+                    creditor: creditorId,
+                };
+
+                const createdDebt = await debtRepository.createDebt(newDebtData, session);
+                transactionDebts.push(createdDebt);
+
+                await userService.incrementUserBalances(
+                    debtorId,
+                    { owe: value },
+                    session
+                );
+            }
+
+            await userService.incrementUserBalances(
+                creditorId,
+                { owes: totalCreditValue },
+                session
+            );
+
+            createdDebts = transactionDebts;
+        });
+    } finally {
+        await session.endSession();
     }
 
-    // Calculamos el monto total que se le acreditará al acreedor.
-    const totalCreditValue = value * uniqueDebtorIds.length;
-
-    // Usamos Promise.all para ejecutar todas las operaciones de forma concurrente,
-    // lo que es más eficiente que un bucle con await.
-    await Promise.all(
-        uniqueDebtorIds.map(async (debtorId) => {
-            // Preparamos los datos para la nueva deuda individual
-            const newDebtData = {
-                description,
-                value, // El valor es por persona
-                debtor: [debtorId], // El array de deudores ahora contiene un solo ID
-                group,
-                debtDate: Date.now(),
-                creditor: creditorId,
-            };
-
-            // 1. Creamos el documento de deuda individual en la BD
-            const createdDebt = await debtRepository.createDebt(newDebtData);
-            createdDebts.push(createdDebt);
-
-            // 2. Actualizamos el saldo 'owe' del deudor individual
-            await userService.incrementUserBalances(debtorId, { owe: value });
-        })
-    );
-
-    // 3. Actualizamos el saldo 'owes' del acreedor una sola vez con el monto total
-    await userService.incrementUserBalances(creditorId, { owes: totalCreditValue });
-
-    // Devolvemos el array con todas las deudas que se crearon
     return createdDebts;
 };
 
@@ -139,44 +152,92 @@ const updateDebt = async (id, debtData, userId) => {
 };
 
 const deleteDebt = async (id, userId) => {
-    const debt = await getExistingDebt(id);
+    const session = await mongoose.startSession();
+    let deletedDebt;
 
-    if (!isDebtCreditor(debt, userId)) {
-        throw createHttpError(403, "Solo el acreedor puede eliminar esta deuda");
+    try {
+        await session.withTransaction(async () => {
+            const debt = await getExistingDebt(id, session);
+
+            if (!isDebtCreditor(debt, userId)) {
+                throw createHttpError(403, "Solo el acreedor puede eliminar esta deuda");
+            }
+
+            // Una deuda pendiente todavía está reflejada en los saldos.
+            // Antes de eliminarla se revierten esos valores en la misma transacción.
+            if (debt.state) {
+                await userService.incrementUserBalances(
+                    toIdString(debt.creditor),
+                    { owes: -debt.value },
+                    session
+                );
+
+                for (const debtorId of debt.debtor) {
+                    await userService.incrementUserBalances(
+                        toIdString(debtorId),
+                        { owe: -debt.value },
+                        session
+                    );
+                }
+            }
+
+            deletedDebt = await debtRepository.deleteDebt(id, session);
+        });
+    } finally {
+        await session.endSession();
     }
 
-    return await debtRepository.deleteDebt(id);
+    return deletedDebt;
 };
 
 const markAsPaid = async (id, userId) => {
-    const debt = await getExistingDebt(id);
-    const isDebtor = isDebtDebtor(debt, userId);
-    const isCreditor = isDebtCreditor(debt, userId);
+    const session = await mongoose.startSession();
+    let paidDebt;
 
-    if (!isDebtor && !isCreditor) {
-        throw createHttpError(403, "No estás autorizado para marcar esta deuda como pagada");
+    try {
+        await session.withTransaction(async () => {
+            const debt = await getExistingDebt(id, session);
+            const isDebtor = isDebtDebtor(debt, userId);
+            const isCreditor = isDebtCreditor(debt, userId);
+
+            if (!isDebtor && !isCreditor) {
+                throw createHttpError(403, "No estás autorizado para marcar esta deuda como pagada");
+            }
+
+            if (!debt.state) {
+                throw createHttpError(400, "La deuda ya fue marcada como pagada");
+            }
+
+            const value = debt.value;
+
+            await userService.incrementUserBalances(
+                toIdString(debt.creditor),
+                { owes: -value },
+                session
+            );
+
+            for (const debtorId of debt.debtor) {
+                await userService.incrementUserBalances(
+                    toIdString(debtorId),
+                    { owe: -value },
+                    session
+                );
+            }
+
+            paidDebt = await debtRepository.updateDebt(
+                id,
+                {
+                    paymentDate: Date.now(),
+                    state: false
+                },
+                session
+            );
+        });
+    } finally {
+        await session.endSession();
     }
 
-    if (!debt.state) {
-        throw createHttpError(400, "La deuda ya fue marcada como pagada");
-    }
-
-    const value = debt.value;
-    const balanceUpdates = [
-        userService.incrementUserBalances(toIdString(debt.creditor), { owes: -value }),
-        ...debt.debtor.map(debtorId => (
-            userService.incrementUserBalances(toIdString(debtorId), { owe: -value })
-        ))
-    ];
-
-    await Promise.all(balanceUpdates);
-
-    const updatedDebtData = {
-        paymentDate: Date.now(),
-        state: false
-    };
-
-    return await debtRepository.updateDebt(id, updatedDebtData);
+    return paidDebt;
 };
 
 const getDebtSummaryForUser = async (userId) => {

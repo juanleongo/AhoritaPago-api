@@ -20,8 +20,8 @@ const getAllGroup = async () => {
     return groups
 }
 
-const getGroupyId = async (id) => {
-    const group = await Group.findById(id)
+const getGroupyId = async (id, session = null) => {
+    const group = await Group.findById(id).session(session)
     return group
 
 }

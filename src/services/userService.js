@@ -113,8 +113,8 @@ const deleteUser = async (id, authenticatedUserId) => {
     return await userRepository.deleteUser(id);
 };
 
-const incrementUserBalances = async (id, balanceChanges) => {
-    const existingUser = await userRepository.getUserById(id);
+const incrementUserBalances = async (id, balanceChanges, session = null) => {
+    const existingUser = await userRepository.getUserById(id, session);
     if (!existingUser) {
         throw createHttpError(404, 'Usuario no encontrado');
     }
@@ -132,7 +132,7 @@ const incrementUserBalances = async (id, balanceChanges) => {
         throw createHttpError(400, 'No se enviaron cambios de saldo válidos');
     }
 
-    return await userRepository.updateUser(id, { $inc: safeChanges });
+    return await userRepository.updateUser(id, { $inc: safeChanges }, session);
 };
 
 module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser,getByNickname,getUserByToken, searchUsersByNickname, incrementUserBalances };

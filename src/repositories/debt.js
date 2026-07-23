@@ -1,16 +1,20 @@
 const Debt = require('../models/debt');
 
-const createDebt = async (debtData) => {
-    return await Debt.create(debtData);
+const createDebt = async (debtData, session = null) => {
+    const debt = new Debt(debtData);
+    return await debt.save({ session });
 };
 
-const deleteDebt = async (id) => {
-    // Usamos findByIdAndDelete en lugar de una actualización de estado
-    return await Debt.findByIdAndDelete(id);
+const deleteDebt = async (id, session = null) => {
+    return await Debt.findByIdAndDelete(id, { session });
 };
 
-const updateDebt = async (id, debtData) => {
-    return await Debt.findByIdAndUpdate(id, debtData, { new: true, runValidators: true });
+const updateDebt = async (id, debtData, session = null) => {
+    return await Debt.findByIdAndUpdate(
+        id,
+        debtData,
+        { new: true, runValidators: true, session }
+    );
 };
 
 const getAllDebtsForUser = async (userId) => {
@@ -19,8 +23,8 @@ const getAllDebtsForUser = async (userId) => {
         .populate('creditor', 'name');
 };
 
-const getDebtById = async (id) => {
-    return await Debt.findById(id);
+const getDebtById = async (id, session = null) => {
+    return await Debt.findById(id).session(session);
 };
 
 const findDebtsAndCreditsByUserId = async (userId) => {
