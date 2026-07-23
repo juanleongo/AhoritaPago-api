@@ -287,6 +287,28 @@ const getDebtSummaryForUser = async (userId) => {
 
     return summary;
 };
+
+const getDebtHistoryForUser = async (userId) => {
+    const debts = await debtRepository.findDebtHistoryByUserId(userId);
+
+    const newestFirst = (dateField) => (firstDebt, secondDebt) => {
+        const firstDate = firstDebt[dateField] || firstDebt.debtDate;
+        const secondDate = secondDebt[dateField] || secondDebt.debtDate;
+
+        return new Date(secondDate).getTime() - new Date(firstDate).getTime();
+    };
+
+    const active = debts
+        .filter(debt => debt.state)
+        .sort(newestFirst('debtDate'));
+
+    const paid = debts
+        .filter(debt => !debt.state)
+        .sort(newestFirst('paymentDate'));
+
+    return { active, paid };
+};
+
 const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
     // 1. Encontrar el grupo usando su código para obtener el ID.
     const group = await groupRepository.getGroupByCode(groupCode);
@@ -316,5 +338,6 @@ module.exports = {
     deleteDebt,
     markAsPaid,
     getDebtSummaryForUser,
+    getDebtHistoryForUser,
     getDebtsForUserInGroupByCode
 };

@@ -11,6 +11,7 @@ const {
     deleteDebt,
     markAsPay,
     getDebtSummary,
+    getDebtHistory,
     getDebtsInGroup
 } = require('../controllers/debt');
 
@@ -22,6 +23,8 @@ router.use(authVerify);
 router.get('/summary', [
     validateForms
 ], getDebtSummary);
+
+router.get('/history', getDebtHistory);
 
 router.get('/group/:groupCode', [
     validateForms

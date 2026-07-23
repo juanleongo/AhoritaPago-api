@@ -93,6 +93,24 @@ const getDebtSummary = async (req = request, res = response) => {
     }
 };
 
+const getDebtHistory = async (req, res = response) => {
+    try {
+        const history = await debtService.getDebtHistoryForUser(req.user.userId);
+
+        res.status(200).json({
+            count: {
+                total: history.active.length + history.paid.length,
+                active: history.active.length,
+                paid: history.paid.length
+            },
+            active: history.active,
+            paid: history.paid
+        });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
 const getDebtsInGroup = async (req = request, res = response) => {
     try {
         const groupCode  = req.params.groupCode; // Extraemos el código del cuerpo de la solicitud
@@ -119,5 +137,6 @@ module.exports = {
     deleteDebt,
     markAsPay,
     getDebtSummary,
+    getDebtHistory,
     getDebtsInGroup
 };
