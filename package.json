@@ -4,9 +4,10 @@
   "description": "app para la gestion de deudas con amigos y familiares",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon --env-file .env index.js ",
-    "start": "node index.js ",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon --exec \"node --env-file=.env\" index.js",
+    "start": "node --env-file=.env index.js",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
   },
   "author": "juan leon , daniel sanabria",
   "license": "MIT",
