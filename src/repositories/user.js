@@ -16,6 +16,12 @@ const getUserByToken = async (id) => {
     return user
 
 }
+const getActiveUserById = async (id) => {
+    const user = await User.findOne({ _id: id, state: true })
+        .select('_id nickname state')
+    return user
+
+}
 const getUserByEmail = async (email) => {
     const user = await  User.findOne( { email })
     return user
@@ -65,6 +71,7 @@ module.exports = {
     getUserByEmail,
     getUserByNickName,
     getUserByToken,
+    getActiveUserById,
     findUsersByNicknameSearch
 
 }

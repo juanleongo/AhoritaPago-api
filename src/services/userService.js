@@ -68,11 +68,19 @@ const createUser = async (userData) => {
     if (nicknameUser) {
         throw new Error('El nombre de usuario ya está en uso');
     }
-    // Encriptar la contraseña
-    const salt = bcryptjs.genSaltSync();
-    userData.password = bcryptjs.hashSync(password, salt);
+    const salt = await bcryptjs.genSalt();
+    const hashedPassword = await bcryptjs.hash(password, salt);
 
-    return await userRepository.createUser(userData);
+    // El registro público solo puede persistir estos cuatro campos.
+    // Saldos, estado y otros atributos internos conservan los defaults del modelo.
+    const newUserData = {
+        name,
+        email,
+        nickname,
+        password: hashedPassword
+    };
+
+    return await userRepository.createUser(newUserData);
 };
 
 const updateUser = async (id, userData, authenticatedUserId) => {

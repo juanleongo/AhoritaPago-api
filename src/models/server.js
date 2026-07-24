@@ -17,9 +17,6 @@ class Server {
        }
       
 
-        //conecta la base de datos
-        this.conectarDB()
-
         this.middleware()
 
         //rutas de la aplicación
@@ -53,8 +50,10 @@ class Server {
         
     }
 
-    start() {
-        this.app.listen(this.port, () => {
+    async start() {
+        await this.conectarDB()
+
+        return this.app.listen(this.port, () => {
             console.log(`app listening on port ${this.port }!`)
             
         })

@@ -60,6 +60,9 @@ npm run dev
 ```
 
 La API utiliza el puerto indicado en `PORT`.
+El puerto solo se abre después de establecer correctamente la conexión con
+MongoDB. Si la conexión falla, la aplicación informa el error y no acepta
+solicitudes HTTP.
 
 ## Variables de entorno
 
@@ -150,7 +153,10 @@ Después de iniciar sesión, las rutas protegidas requieren:
 Authorization: Bearer <token>
 ```
 
-El JWT dura cuatro horas e incluye `userId` y `nick`.
+El JWT dura cuatro horas e incluye `userId` y `nick`. En cada solicitud
+protegida también se comprueba que el usuario todavía exista y tenga
+`state: true`; desactivar una cuenta invalida inmediatamente sus tokens aunque
+no hayan expirado.
 
 Solo estas operaciones son públicas:
 
@@ -163,6 +169,9 @@ Las demás rutas de usuarios, grupos y deudas requieren un JWT válido.
 
 ### Usuarios
 
+- El registro público solo acepta `name`, `nickname`, `email` y `password`.
+  Los saldos, el estado y los demás campos internos conservan los valores
+  definidos por el servidor.
 - Un usuario puede consultar, modificar y desactivar únicamente su perfil.
 - La edición del perfil permite `name`, `nickname` y `email`.
 - `owe`, `owes`, `state` y `password` no se pueden modificar directamente.
@@ -385,6 +394,9 @@ durante cada prueba.
 Cobertura inicial:
 
 - JWT ausente, mal formado, expirado, incompleto y válido.
+- Rechazo de tokens pertenecientes a usuarios inexistentes o desactivados.
+- Protección de campos internos durante el registro público.
+- Espera de MongoDB antes de abrir el puerto HTTP.
 - Protección global de rutas.
 - Propiedad del perfil y bloqueo de campos sensibles.
 - Membresía y administración de grupos.

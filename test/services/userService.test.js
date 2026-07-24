@@ -1,5 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const bcryptjs = require('bcryptjs');
 const userRepository = require('../../src/repositories/user');
 const userService = require('../../src/services/userService');
 
@@ -21,6 +22,43 @@ const withRepositoryStubs = async (stubs, work) => {
 };
 
 describe('userService: autorización y campos permitidos', () => {
+    it('el registro descarta campos internos y cifra la contraseña', async () => {
+        let persistedData;
+
+        await withRepositoryStubs(
+            {
+                getUserByEmail: async () => null,
+                getUserByNickName: async () => null,
+                createUser: async data => {
+                    persistedData = data;
+                    return data;
+                }
+            },
+            async () => {
+                await userService.createUser({
+                    name: 'Usuario',
+                    email: 'user@example.com',
+                    nickname: 'usuario',
+                    password: 'password-seguro',
+                    owe: 999999,
+                    owes: 999999,
+                    state: false,
+                    google: 'attacker'
+                });
+            }
+        );
+
+        assert.deepEqual(
+            Object.keys(persistedData).sort(),
+            ['email', 'name', 'nickname', 'password']
+        );
+        assert.notEqual(persistedData.password, 'password-seguro');
+        assert.equal(
+            await bcryptjs.compare('password-seguro', persistedData.password),
+            true
+        );
+    });
+
     it('impide consultar el perfil de otro usuario', async () => {
         await assert.rejects(
             () => userService.getUserById('user-2', 'user-1'),
