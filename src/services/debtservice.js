@@ -21,7 +21,7 @@ const getExistingDebt = async (id, session = null) => {
     const debt = await debtRepository.getDebtById(id, session);
 
     if (!debt) {
-        throw createHttpError(404, "Deuda no encontrada");
+        throw createHttpError(404, "Deuda no encontrada", "DEBT_NOT_FOUND");
     }
 
     return debt;
@@ -36,7 +36,11 @@ const getDebtById = async (id, userId) => {
     const debt = await getExistingDebt(id);
 
     if (!isDebtCreditor(debt, userId) && !isDebtDebtor(debt, userId)) {
-        throw createHttpError(403, "No tienes permiso para consultar esta deuda");
+        throw createHttpError(
+            403,
+            "No tienes permiso para consultar esta deuda",
+            "DEBT_ACCESS_FORBIDDEN"
+        );
     }
 
     return debt;
@@ -48,27 +52,47 @@ const createDebt = async (debtData, creditorData) => {
 
     if (!description || !value || !group || !debtors || !Array.isArray(debtors) || debtors.length === 0) {
 
-        throw createHttpError(400, "Se requiere una descripción, un valor, un grupo y una lista de deudores.");
+        throw createHttpError(
+            400,
+            "Se requiere una descripción, un valor, un grupo y una lista de deudores.",
+            "DEBT_REQUIRED_FIELDS_MISSING"
+        );
     }
 
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw createHttpError(400, "El valor de la deuda debe ser un número mayor que cero.");
+        throw createHttpError(
+            400,
+            "El valor de la deuda debe ser un número mayor que cero.",
+            "DEBT_VALUE_INVALID"
+        );
     }
 
     const creditorId = creditorData.userId;
 
     if (debtors.some(debtorId => !debtorId)) {
-        throw createHttpError(400, "La lista de deudores contiene identificadores inválidos");
+        throw createHttpError(
+            400,
+            "La lista de deudores contiene identificadores inválidos",
+            "DEBTOR_ID_INVALID"
+        );
     }
 
     const uniqueDebtorIds = [...new Set(debtors.map(debtorId => debtorId.toString()))];
 
     if (uniqueDebtorIds.length !== debtors.length) {
-        throw createHttpError(400, "La lista de deudores contiene usuarios repetidos");
+        throw createHttpError(
+            400,
+            "La lista de deudores contiene usuarios repetidos",
+            "DEBTOR_DUPLICATED"
+        );
     }
 
     if (uniqueDebtorIds.includes(creditorId.toString())) {
-        throw createHttpError(400, "El acreedor no puede registrarse como deudor");
+        throw createHttpError(
+            400,
+            "El acreedor no puede registrarse como deudor",
+            "CREDITOR_CANNOT_BE_DEBTOR"
+        );
     }
 
     const totalCreditValue = value * uniqueDebtorIds.length;
@@ -80,17 +104,29 @@ const createDebt = async (debtData, creditorData) => {
             const targetGroup = await groupRepository.getGroupyId(group, session);
 
             if (!targetGroup || !targetGroup.state) {
-                throw createHttpError(404, "Grupo no encontrado");
+                throw createHttpError(
+                    404,
+                    "Grupo no encontrado",
+                    "GROUP_NOT_FOUND"
+                );
             }
 
             const memberIds = new Set(targetGroup.members.map(toIdString));
 
             if (!memberIds.has(creditorId.toString())) {
-                throw createHttpError(403, "No puedes crear deudas en un grupo al que no perteneces");
+                throw createHttpError(
+                    403,
+                    "No puedes crear deudas en un grupo al que no perteneces",
+                    "DEBT_CREATE_FORBIDDEN"
+                );
             }
 
             if (uniqueDebtorIds.some(debtorId => !memberIds.has(debtorId))) {
-                throw createHttpError(403, "Todos los deudores deben pertenecer al grupo");
+                throw createHttpError(
+                    403,
+                    "Todos los deudores deben pertenecer al grupo",
+                    "DEBTOR_NOT_GROUP_MEMBER"
+                );
             }
 
             const transactionDebts = [];
@@ -137,15 +173,27 @@ const updateDebt = async (id, debtData, userId) => {
     const debt = await getExistingDebt(id);
 
     if (!isDebtCreditor(debt, userId)) {
-        throw createHttpError(403, "Solo el acreedor puede modificar esta deuda");
+        throw createHttpError(
+            403,
+            "Solo el acreedor puede modificar esta deuda",
+            "DEBT_UPDATE_FORBIDDEN"
+        );
     }
 
     if (!debt.state) {
-        throw createHttpError(400, "No se puede modificar una deuda pagada");
+        throw createHttpError(
+            400,
+            "No se puede modificar una deuda pagada",
+            "PAID_DEBT_UPDATE_INVALID"
+        );
     }
 
     if (!Object.prototype.hasOwnProperty.call(debtData, 'description')) {
-        throw createHttpError(400, "Solo se permite actualizar la descripción de la deuda");
+        throw createHttpError(
+            400,
+            "Solo se permite actualizar la descripción de la deuda",
+            "DEBT_UPDATE_FIELDS_INVALID"
+        );
     }
 
     return await debtRepository.updateDebt(id, { description: debtData.description });
@@ -160,7 +208,11 @@ const deleteDebt = async (id, userId) => {
             const debt = await getExistingDebt(id, session);
 
             if (!isDebtCreditor(debt, userId)) {
-                throw createHttpError(403, "Solo el acreedor puede eliminar esta deuda");
+                throw createHttpError(
+                    403,
+                    "Solo el acreedor puede eliminar esta deuda",
+                    "DEBT_DELETE_FORBIDDEN"
+                );
             }
 
             // Una deuda pendiente todavía está reflejada en los saldos.
@@ -201,11 +253,19 @@ const markAsPaid = async (id, userId) => {
             const isCreditor = isDebtCreditor(debt, userId);
 
             if (!isDebtor && !isCreditor) {
-                throw createHttpError(403, "No estás autorizado para marcar esta deuda como pagada");
+                throw createHttpError(
+                    403,
+                    "No estás autorizado para marcar esta deuda como pagada",
+                    "DEBT_PAYMENT_FORBIDDEN"
+                );
             }
 
             if (!debt.state) {
-                throw createHttpError(400, "La deuda ya fue marcada como pagada");
+                throw createHttpError(
+                    409,
+                    "La deuda ya fue marcada como pagada",
+                    "DEBT_ALREADY_PAID"
+                );
             }
 
             const value = debt.value;
@@ -314,13 +374,21 @@ const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
     const group = await groupRepository.getGroupByCode(groupCode);
 
     if (!group) {
-        throw createHttpError(404, "El grupo con ese código no fue encontrado.");
+        throw createHttpError(
+            404,
+            "El grupo con ese código no fue encontrado.",
+            "GROUP_NOT_FOUND"
+        );
     }
 
     // Opcional: Verificar si el usuario es miembro del grupo antes de buscar deudas.
     const isMember = group.members.some(memberId => memberId.toString() === userId);
     if (!isMember) {
-        throw createHttpError(403, "No eres miembro de este grupo.");
+        throw createHttpError(
+            403,
+            "No eres miembro de este grupo.",
+            "GROUP_ACCESS_FORBIDDEN"
+        );
     }
 
     // 2. Usar el ID del grupo para buscar las deudas.

@@ -13,12 +13,16 @@ const getAllUsers = async () => {
 
 const getUserById = async (id, authenticatedUserId) => {
     if (!isSameUser(id, authenticatedUserId)) {
-        throw createHttpError(403, 'No tienes permiso para consultar este usuario');
+        throw createHttpError(
+            403,
+            'No tienes permiso para consultar este usuario',
+            'USER_ACCESS_FORBIDDEN'
+        );
     }
 
     const user = await userRepository.getUserById(id);
     if (!user) {
-        throw createHttpError(404, 'Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
     return user;
 };
@@ -26,7 +30,7 @@ const getUserById = async (id, authenticatedUserId) => {
 const getByNickname= async (nickname) => {
     const user = await userRepository.getUserByNickName(nickname);
     if (!user) {
-        throw new Error('Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
     
     return user;
@@ -35,7 +39,11 @@ const getByNickname= async (nickname) => {
 const searchUsersByNickname = async (searchTerm) => {
     if (!searchTerm || searchTerm.trim().length < 2) {
         // Evitamos búsquedas vacías o muy cortas para no sobrecargar la BD.
-        throw new Error('El término de búsqueda debe tener al menos 2 caracteres.');
+        throw createHttpError(
+            400,
+            'El término de búsqueda debe tener al menos 2 caracteres.',
+            'SEARCH_TERM_TOO_SHORT'
+        );
     }
 
     const users = await userRepository.findUsersByNicknameSearch(searchTerm);
@@ -46,7 +54,7 @@ const searchUsersByNickname = async (searchTerm) => {
 const getUserByToken= async (token) => {
     const user = await userRepository.getUserByToken(token.userId);
     if (!user) {
-        throw new Error('Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
     
     return user;
@@ -56,17 +64,29 @@ const createUser = async (userData) => {
     const { name, email, nickname, password } = userData;
 
     if (!name || !email || !nickname || !password) {
-        throw new Error('El nombre, correo electrónico, nombre de usuario y contraseña son obligatorios');
+        throw createHttpError(
+            400,
+            'El nombre, correo electrónico, nombre de usuario y contraseña son obligatorios',
+            'USER_REQUIRED_FIELDS_MISSING'
+        );
     }
 
     const existingEmail = await userRepository.getUserByEmail(email);
     if (existingEmail) {
-        throw new Error('El correo electrónico ya está en uso');
+        throw createHttpError(
+            409,
+            'El correo electrónico ya está en uso',
+            'EMAIL_ALREADY_IN_USE'
+        );
     }
 
     const nicknameUser = await userRepository.getUserByNickName(nickname);
     if (nicknameUser) {
-        throw new Error('El nombre de usuario ya está en uso');
+        throw createHttpError(
+            409,
+            'El nombre de usuario ya está en uso',
+            'NICKNAME_ALREADY_IN_USE'
+        );
     }
     const salt = await bcryptjs.genSalt();
     const hashedPassword = await bcryptjs.hash(password, salt);
@@ -85,12 +105,16 @@ const createUser = async (userData) => {
 
 const updateUser = async (id, userData, authenticatedUserId) => {
     if (!isSameUser(id, authenticatedUserId)) {
-        throw createHttpError(403, 'No tienes permiso para modificar este usuario');
+        throw createHttpError(
+            403,
+            'No tienes permiso para modificar este usuario',
+            'USER_UPDATE_FORBIDDEN'
+        );
     }
 
     const existingUser = await userRepository.getUserById(id);
     if (!existingUser) {
-        throw createHttpError(404, 'Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
 
     const allowedFields = ['name', 'nickname', 'email'];
@@ -103,7 +127,11 @@ const updateUser = async (id, userData, authenticatedUserId) => {
     });
 
     if (Object.keys(allowedData).length === 0) {
-        throw createHttpError(400, 'No se enviaron campos permitidos para actualizar');
+        throw createHttpError(
+            400,
+            'No se enviaron campos permitidos para actualizar',
+            'USER_UPDATE_FIELDS_INVALID'
+        );
     }
 
     return await userRepository.updateUser(id, allowedData);
@@ -111,12 +139,16 @@ const updateUser = async (id, userData, authenticatedUserId) => {
 
 const deleteUser = async (id, authenticatedUserId) => {
     if (!isSameUser(id, authenticatedUserId)) {
-        throw createHttpError(403, 'No tienes permiso para eliminar este usuario');
+        throw createHttpError(
+            403,
+            'No tienes permiso para eliminar este usuario',
+            'USER_DELETE_FORBIDDEN'
+        );
     }
 
     const existingUser = await userRepository.getUserById(id);
     if (!existingUser) {
-        throw createHttpError(404, 'Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
     return await userRepository.deleteUser(id);
 };
@@ -124,7 +156,7 @@ const deleteUser = async (id, authenticatedUserId) => {
 const incrementUserBalances = async (id, balanceChanges, session = null) => {
     const existingUser = await userRepository.getUserById(id, session);
     if (!existingUser) {
-        throw createHttpError(404, 'Usuario no encontrado');
+        throw createHttpError(404, 'Usuario no encontrado', 'USER_NOT_FOUND');
     }
 
     const allowedBalances = ['owe', 'owes'];
@@ -137,7 +169,11 @@ const incrementUserBalances = async (id, balanceChanges, session = null) => {
     });
 
     if (Object.keys(safeChanges).length === 0) {
-        throw createHttpError(400, 'No se enviaron cambios de saldo válidos');
+        throw createHttpError(
+            400,
+            'No se enviaron cambios de saldo válidos',
+            'BALANCE_CHANGES_INVALID'
+        );
     }
 
     return await userRepository.updateUser(id, { $inc: safeChanges }, session);

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { connection } = require('../db/config');
+const { errorHandler, notFoundHandler } = require('../middlewares');
 class Server {
      
     constructor() {
@@ -22,6 +23,8 @@ class Server {
         //rutas de la aplicación
         this.routes()
 
+        this.errorMiddleware()
+
     }
     async conectarDB() {
         await connection();
@@ -31,15 +34,8 @@ class Server {
         //habilitar cors
         this.app.use(cors())
 
-        //parseo y formato del body 
+        //parseo y formato del body
         this.app.use(express.json())
-
-        //servir contenido en el front
-       
-        
-        //cargar archivos
-        
-        
     }
 
     routes() {
@@ -48,6 +44,11 @@ class Server {
         this.app.use(this.paths.auth, require('../routes/auth'))
         this.app.use(this.paths.payment, require('../routes/debt'))
         
+    }
+
+    errorMiddleware() {
+        this.app.use(notFoundHandler)
+        this.app.use(errorHandler)
     }
 
     async start() {

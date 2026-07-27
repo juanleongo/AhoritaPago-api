@@ -1,133 +1,88 @@
-const {response}= require('express')
 const debtService = require('../services/debtservice');
+const { asyncHandler } = require('../middlewares/asyncHandler');
 
-// Obtener todas las deudas
-const getAllDebts = async (req, res=response) => {
-    try {
-        const debts = await debtService.getAllDebts(req.user.userId);
-        res.json(debts);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
+const getAllDebts = asyncHandler(async (req, res) => {
+    const debts = await debtService.getAllDebts(req.user.userId);
+    res.status(200).json(debts);
+});
 
-// Obtener una deuda por ID
-const getDebtById = async (req, res) => {
-    try {
-        const debt = await debtService.getDebtById(req.params.id, req.user.userId);
-        if (!debt) {
-            return res.status(404).json({ message: 'Deuda no encontrada' });
-        }
-        res.status(200).json(debt);
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+const getDebtById = asyncHandler(async (req, res) => {
+    const debt = await debtService.getDebtById(
+        req.params.id,
+        req.user.userId
+    );
 
-// Crear una nueva deuda
-const createDebt = async (req, res) => {
-    try {
-        const debt = await debtService.createDebt(req.body,req.user);
-        res.status(201).json(debt);
-    } catch (error) {
-        res.status(error.statusCode || 400).json({ error: error.message });
-    }
-};
+    res.status(200).json(debt);
+});
 
-// Actualizar una deuda
-const updateDebt = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updated = await debtService.updateDebt(id, req.body, req.user.userId);
-        if (!updated) {
-            return res.status(404).json({ message: 'Deuda no encontrada' });
-        }
-        res.json(updated);
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+const createDebt = asyncHandler(async (req, res) => {
+    const debt = await debtService.createDebt(req.body, req.user);
+    res.status(201).json(debt);
+});
 
-// Eliminar una deuda
-const deleteDebt = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const deleted = await debtService.deleteDebt(id, req.user.userId);
-        if (!deleted) {
-            return res.status(404).json({ message: 'Deuda no encontrada' });
-        }
-        res.json({ message: 'Deuda eliminada correctamente' });
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+const updateDebt = asyncHandler(async (req, res) => {
+    const updated = await debtService.updateDebt(
+        req.params.id,
+        req.body,
+        req.user.userId
+    );
 
-// Marcar una deuda como pagada
-const markAsPay = async (req, res) => {
-    try {
-        //const { id,group} = req.body;
-        const userId = req.user.userId;
-        const paidDebt = await debtService.markAsPaid(req.params.id, userId);
-        if (!paidDebt) {
-            return res.status(404).json({ message: 'Deuda no encontrada' });
-        }
-        res.json({ message: 'Deuda marcada como pagada', debt: paidDebt });
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+    res.status(200).json(updated);
+});
 
-const getDebtSummary = async (req = request, res = response) => {
-    try {
-        // Obtenemos el ID del token JWT
-        const summary = await debtService.getDebtSummaryForUser(req.user.userId);
+const deleteDebt = asyncHandler(async (req, res) => {
+    await debtService.deleteDebt(req.params.id, req.user.userId);
+    res.status(200).json({ message: 'Deuda eliminada correctamente' });
+});
 
-        res.status(200).json({
-            msg: 'Resumen financiero obtenido con éxito.',
-            summary
-        });
+const markAsPay = asyncHandler(async (req, res) => {
+    const paidDebt = await debtService.markAsPaid(
+        req.params.id,
+        req.user.userId
+    );
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Hubo un error al generar el resumen.' });
-    }
-};
+    res.status(200).json({
+        message: 'Deuda marcada como pagada',
+        debt: paidDebt
+    });
+});
 
-const getDebtHistory = async (req, res = response) => {
-    try {
-        const history = await debtService.getDebtHistoryForUser(req.user.userId);
+const getDebtSummary = asyncHandler(async (req, res) => {
+    const summary = await debtService.getDebtSummaryForUser(req.user.userId);
 
-        res.status(200).json({
-            count: {
-                total: history.active.length + history.paid.length,
-                active: history.active.length,
-                paid: history.paid.length
-            },
-            active: history.active,
-            paid: history.paid
-        });
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+    res.status(200).json({
+        msg: 'Resumen financiero obtenido con éxito.',
+        summary
+    });
+});
 
-const getDebtsInGroup = async (req = request, res = response) => {
-    try {
-        const groupCode  = req.params.groupCode; // Extraemos el código del cuerpo de la solicitud
-        const userId = req.user.userId;   // Extraemos el ID del usuario del token
+const getDebtHistory = asyncHandler(async (req, res) => {
+    const history = await debtService.getDebtHistoryForUser(req.user.userId);
 
-        const debts = await debtService.getDebtsForUserInGroupByCode(userId, groupCode);
+    res.status(200).json({
+        count: {
+            total: history.active.length + history.paid.length,
+            active: history.active.length,
+            paid: history.paid.length
+        },
+        active: history.active,
+        paid: history.paid
+    });
+});
 
-        res.status(200).json({
-            msg: `Deudas encontradas en el grupo ${groupCode}`,
-            count: debts.length,
-            debts
-        });
+const getDebtsInGroup = asyncHandler(async (req, res) => {
+    const { groupCode } = req.params;
+    const debts = await debtService.getDebtsForUserInGroupByCode(
+        req.user.userId,
+        groupCode
+    );
 
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
-    }
-};
+    res.status(200).json({
+        msg: `Deudas encontradas en el grupo ${groupCode}`,
+        count: debts.length,
+        debts
+    });
+});
 
 module.exports = {
     getAllDebts,

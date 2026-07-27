@@ -126,6 +126,23 @@ Repositories
 Mongoose / MongoDB
 ```
 
+Si cualquier middleware, controlador, servicio o repositorio produce una
+excepción, esta se propaga hacia un único middleware global:
+
+```text
+Error de aplicación
+        |
+        v
+Normalización del error
+        |
+        +--> Error esperado: conserva estado, código y mensaje
+        |
+        `--> Error interno: registra el detalle y oculta información sensible
+        |
+        v
+Respuesta JSON uniforme
+```
+
 Responsabilidad de cada carpeta:
 
 ```text
@@ -397,6 +414,10 @@ Cobertura inicial:
 - Rechazo de tokens pertenecientes a usuarios inexistentes o desactivados.
 - Protección de campos internos durante el registro público.
 - Espera de MongoDB antes de abrir el puerto HTTP.
+- Contrato uniforme para errores de negocio.
+- Ocultamiento de mensajes y detalles técnicos en errores internos.
+- Propagación de excepciones asíncronas.
+- Errores JSON para rutas inexistentes y validaciones.
 - Protección global de rutas.
 - Propiedad del perfil y bloqueo de campos sensibles.
 - Membresía y administración de grupos.
@@ -417,6 +438,45 @@ se pueden incorporar pruebas de integración contra una base MongoDB aislada.
 
 ## Respuestas de error
 
+Todos los errores utilizan el mismo contrato JSON:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "GROUP_NOT_FOUND",
+    "message": "Grupo no encontrado"
+  }
+}
+```
+
+`code` es un identificador estable que el cliente puede utilizar para decidir
+qué acción o mensaje mostrar. `message` contiene la explicación destinada al
+usuario.
+
+Los errores de validación incluyen una lista `details`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Los datos enviados no son válidos.",
+    "details": [
+      {
+        "type": "field",
+        "path": "email",
+        "message": "El correo es obligatorio",
+        "location": "body"
+      }
+    ]
+  }
+}
+```
+
+Los valores enviados por el cliente, incluidas las contraseñas, no se incluyen
+en `details`.
+
 La API utiliza principalmente:
 
 | Estado | Significado |
@@ -425,4 +485,22 @@ La API utiliza principalmente:
 | `401` | JWT ausente, inválido o expirado. |
 | `403` | Usuario autenticado sin permiso sobre el recurso. |
 | `404` | Recurso no encontrado. |
+| `409` | Conflicto con el estado o con un registro existente. |
+| `413` | Cuerpo de la solicitud demasiado grande. |
 | `500` | Error interno inesperado. |
+
+Los errores `500` siempre responden:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INTERNAL_SERVER_ERROR",
+    "message": "Ocurrió un error interno."
+  }
+}
+```
+
+El mensaje técnico original se registra únicamente en el servidor. Las rutas
+inexistentes también responden JSON con el código `ROUTE_NOT_FOUND` y los
+cuerpos JSON mal formados utilizan `INVALID_JSON`.

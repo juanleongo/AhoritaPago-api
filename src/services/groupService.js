@@ -18,51 +18,60 @@ const getAllGroups = async (userId) => {
 const getGroupById = async (id, userId) => {
     const group = await groupRepository.getGroupyId(id);
     if (!group) {
-        throw createHttpError(404, 'Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado', 'GROUP_NOT_FOUND');
     }
 
     if (!isGroupMember(group, userId)) {
-        throw createHttpError(403, 'No tienes permiso para consultar este grupo');
+        throw createHttpError(
+            403,
+            'No tienes permiso para consultar este grupo',
+            'GROUP_ACCESS_FORBIDDEN'
+        );
     }
 
     return group;
 };
 
 const getGroupsForUser = async (userId) => {
-    try {
-        const groups = await groupRepository.getAllGroupsByUser(userId);
+    const groups = await groupRepository.getAllGroupsByUser(userId);
 
-        // Es una buena práctica manejar el caso en que no se encuentren grupos.
-        if (!groups || groups.length === 0) {
-            return {
-                success: true,
-                data: [],
-                message: 'El usuario no pertenece a ningún grupo.'
-            };
-        }
-
-        return { success: true, data: groups };
-
-    } catch (error) {
-        throw new Error( error);
-        
+    if (!groups || groups.length === 0) {
+        return {
+            success: true,
+            data: [],
+            message: 'El usuario no pertenece a ningún grupo.'
+        };
     }
+
+    return { success: true, data: groups };
 };
 
 const createGroup = async (groupData,userData) => {
     if (!groupData.name) {
-        throw new Error('El nombre del grupo es obligatorio');
+        throw createHttpError(
+            400,
+            'El nombre del grupo es obligatorio',
+            'GROUP_NAME_REQUIRED'
+        );
     }
     const existingGroup = await groupRepository.getGroupByName(groupData.name);
     if (existingGroup) {
-        throw new Error('El nombre del grupo ya está en uso');
+        throw createHttpError(
+            409,
+            'El nombre del grupo ya está en uso',
+            'GROUP_NAME_ALREADY_IN_USE'
+        );
     }
     
     let code = generateRandomCode() ;
     const existingCode = await groupRepository.getGroupByCode(code)
     while (existingCode){
         code = generateRandomCode()
-        throw new Error('codigo ya esta en uso');
+        throw createHttpError(
+            409,
+            'El código generado para el grupo ya está en uso',
+            'GROUP_CODE_CONFLICT'
+        );
         
     }
 
@@ -79,15 +88,23 @@ const createGroup = async (groupData,userData) => {
 const updateGroup = async (id, groupData, authenticatedUserId) => {
     const existingGroup = await groupRepository.getGroupyId(id);
     if (!existingGroup) {
-        throw createHttpError(404, 'Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado', 'GROUP_NOT_FOUND');
     }
 
     if (!isSameId(existingGroup.admin, authenticatedUserId)) {
-        throw createHttpError(403, 'Solo el administrador puede modificar el grupo');
+        throw createHttpError(
+            403,
+            'Solo el administrador puede modificar el grupo',
+            'GROUP_UPDATE_FORBIDDEN'
+        );
     }
 
     if (!Object.prototype.hasOwnProperty.call(groupData, 'name')) {
-        throw createHttpError(400, 'Solo se permite actualizar el nombre del grupo');
+        throw createHttpError(
+            400,
+            'Solo se permite actualizar el nombre del grupo',
+            'GROUP_UPDATE_FIELDS_INVALID'
+        );
     }
 
     return await groupRepository.updateGroup(id, { name: groupData.name });
@@ -96,11 +113,15 @@ const updateGroup = async (id, groupData, authenticatedUserId) => {
 const deleteGroup = async (id, authenticatedUserId) => {
     const existingGroup = await groupRepository.getGroupyId(id);
     if (!existingGroup) {
-        throw createHttpError(404, 'Grupo no encontrado');
+        throw createHttpError(404, 'Grupo no encontrado', 'GROUP_NOT_FOUND');
     }
 
     if (!isSameId(existingGroup.admin, authenticatedUserId)) {
-        throw createHttpError(403, 'Solo el administrador puede eliminar el grupo');
+        throw createHttpError(
+            403,
+            'Solo el administrador puede eliminar el grupo',
+            'GROUP_DELETE_FORBIDDEN'
+        );
     }
 
     return await groupRepository.deleteGroup(id);
@@ -110,21 +131,29 @@ const addMemberToGroup = async (groupCode, userNick, requesterId) => {
     const group = await groupRepository.getGroupByCode(groupCode);
 
     if (!group) {
-        throw createHttpError(404, 'El grupo no existe');
+        throw createHttpError(404, 'El grupo no existe', 'GROUP_NOT_FOUND');
     }
 
     if (!isGroupMember(group, requesterId)) {
-        throw createHttpError(403, 'Solo un integrante del grupo puede agregar miembros');
+        throw createHttpError(
+            403,
+            'Solo un integrante del grupo puede agregar miembros',
+            'GROUP_MEMBER_ADD_FORBIDDEN'
+        );
     }
 
     const user = await userRepository.getUserByNickName(userNick);
 
     if (!user) {
-        throw createHttpError(404, 'El usuario no existe');
+        throw createHttpError(404, 'El usuario no existe', 'USER_NOT_FOUND');
     }
 
     if (isGroupMember(group, user._id)) {
-        throw createHttpError(400, 'El usuario ya es miembro del grupo');
+        throw createHttpError(
+            409,
+            'El usuario ya es miembro del grupo',
+            'USER_ALREADY_GROUP_MEMBER'
+        );
     }
 
     group.members.push(user._id);

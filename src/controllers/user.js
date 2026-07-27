@@ -1,100 +1,67 @@
-const {response}= require('express')
 const userService = require('../services/userService');
+const { asyncHandler } = require('../middlewares/asyncHandler');
 
-const getAllUsers = async (req, res= response) => {
-    try {
-        const users = await userService.getAllUsers();
-        res.status(200).json(users);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+const getAllUsers = asyncHandler(async (req, res) => {
+    const users = await userService.getAllUsers();
+    res.status(200).json(users);
+});
+
+const getUserById = asyncHandler(async (req, res) => {
+    const user = await userService.getUserById(
+        req.params.id,
+        req.user.userId
+    );
+
+    res.status(200).json(user);
+});
+
+const getByNickname = asyncHandler(async (req, res) => {
+    const user = await userService.getByNickname(req.body.nick);
+    res.status(200).json(user);
+});
+
+const getUserByToken = asyncHandler(async (req, res) => {
+    const user = await userService.getUserByToken(req.user);
+    res.status(200).json(user);
+});
+
+const searchUsers = asyncHandler(async (req, res) => {
+    const { searchTerm } = req.params;
+    const users = await userService.searchUsersByNickname(searchTerm);
+
+    res.status(200).json({
+        msg: `Resultados de la búsqueda para '${searchTerm}'`,
+        results: users
+    });
+});
+
+const createUser = asyncHandler(async (req, res) => {
+    const newUser = await userService.createUser(req.body);
+    res.status(201).json(newUser);
+});
+
+const updateUser = asyncHandler(async (req, res) => {
+    const updatedUser = await userService.updateUser(
+        req.params.id,
+        req.body,
+        req.user.userId
+    );
+
+    res.status(200).json(updatedUser);
+});
+
+const deleteUser = asyncHandler(async (req, res) => {
+    await userService.deleteUser(req.params.id, req.user.userId);
+    res.status(200).json({ message: 'Usuario eliminado correctamente' });
+});
+
+module.exports = {
+    getAllUsers,
+    getUserById,
+    createUser,
+    updateUser,
+    deleteUser,
+    getByNickname,
+    getUserByToken,
+    searchUsers
 };
-
-const getUserById = async (req, res) => {
-    try {
-        const user = await userService.getUserById(req.params.id, req.user.userId);
-        if (!user) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ message: error.message });
-    }
-};
-const getByNickname = async (req, res) => {
-    try {
-        const user = await userService.getByNickname(req.body.nick);
-        
-        if (!user) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const getUserByToken= async (req, res) => {
-    try {
-        const user = await userService.getUserByToken(req.user);
-        
-        if (!user) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const searchUsers = async (req = request, res = response) => {
-    try {
-        const { searchTerm } = req.params; // Extraemos el término de la URL
-        const users = await userService.searchUsersByNickname(searchTerm);
-
-        res.status(200).json({
-            msg: `Resultados de la búsqueda para '${searchTerm}'`,
-            results: users
-        });
-
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-};
-
-const createUser = async (req,  res= response) => {
-    try {
-        const newUser = await userService.createUser(req.body);
-        res.status(201).json(newUser);
-    } catch (error) {
-        
-        res.status(500).json({ message: error.message });
-    }
-
-};
-
-const updateUser = async (req, res) => {
-    try {
-        const updatedUser = await userService.updateUser(req.params.id, req.body, req.user.userId);
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        res.status(200).json(updatedUser);
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ message: error.message });
-    }
-};
-
-const deleteUser = async (req, res) => {
-    try {
-        const deleted = await userService.deleteUser(req.params.id, req.user.userId);
-        if (!deleted) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        res.status(200).json({ message: 'Usuario eliminado correctamente' });
-    } catch (error) {
-        res.status(error.statusCode || 500).json({ message: error.message });
-    }
-};
-
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, getByNickname,getUserByToken, searchUsers };

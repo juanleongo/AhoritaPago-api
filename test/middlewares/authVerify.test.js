@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const userRepository = require('../../src/repositories/user');
 const { authVerify } = require('../../src/middlewares/authVerify');
+const { errorHandler } = require('../../src/middlewares/errorHandler');
 
 const JWT_SECRET = 'test-secret';
 
@@ -20,6 +21,7 @@ const executeMiddleware = async (authorization) => {
     };
 
     const res = {
+        headersSent: false,
         status(statusCode) {
             result.statusCode = statusCode;
             return this;
@@ -31,8 +33,12 @@ const executeMiddleware = async (authorization) => {
     };
 
     await authVerify(req, res, error => {
+        if (error) {
+            result.error = error;
+            return errorHandler(error, req, res, () => {});
+        }
+
         result.nextCalled = true;
-        result.error = error;
         result.user = req.user;
     });
 
@@ -75,7 +81,11 @@ describe('authVerify', () => {
         const result = await executeMiddleware('Basic credentials');
 
         assert.equal(result.statusCode, 401);
-        assert.match(result.body.msg, /formato de autorización inválido/i);
+        assert.equal(result.body.error.code, 'TOKEN_FORMAT_INVALID');
+        assert.match(
+            result.body.error.message,
+            /formato de autorización inválido/i
+        );
     });
 
     it('rechaza un token inválido o expirado', async () => {
@@ -88,7 +98,8 @@ describe('authVerify', () => {
         const result = await executeMiddleware(`Bearer ${expiredToken}`);
 
         assert.equal(result.statusCode, 401);
-        assert.match(result.body.msg, /inválido o expirado/i);
+        assert.equal(result.body.error.code, 'TOKEN_INVALID_OR_EXPIRED');
+        assert.match(result.body.error.message, /inválido o expirado/i);
     });
 
     it('rechaza un JWT válido que no contenga userId', async () => {
@@ -97,6 +108,7 @@ describe('authVerify', () => {
 
         assert.equal(result.statusCode, 401);
         assert.equal(result.nextCalled, false);
+        assert.equal(result.body.error.code, 'TOKEN_INVALID');
     });
 
     it('rechaza un JWT perteneciente a un usuario desactivado', async () => {
@@ -110,7 +122,8 @@ describe('authVerify', () => {
 
         assert.equal(result.statusCode, 401);
         assert.equal(result.nextCalled, false);
-        assert.match(result.body.msg, /desactivado/i);
+        assert.equal(result.body.error.code, 'TOKEN_USER_INACTIVE');
+        assert.match(result.body.error.message, /desactivado/i);
     });
 
     it('continúa y adjunta el usuario cuando el JWT es válido', async () => {

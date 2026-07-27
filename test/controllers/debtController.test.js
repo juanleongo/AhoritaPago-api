@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const debtService = require('../../src/services/debtservice');
 const { getDebtHistory } = require('../../src/controllers/debt');
+const { errorHandler } = require('../../src/middlewares/errorHandler');
 
 const createResponse = () => {
     const result = {
@@ -12,6 +13,7 @@ const createResponse = () => {
     return {
         result,
         response: {
+            headersSent: false,
             status(statusCode) {
                 result.statusCode = statusCode;
                 return this;
@@ -67,17 +69,34 @@ describe('debtController: historial', () => {
         };
 
         const { result, response } = createResponse();
+        let propagatedError;
 
         try {
             await getDebtHistory(
                 { user: { userId: 'user-1' } },
-                response
+                response,
+                error => {
+                    propagatedError = error;
+                }
             );
         } finally {
             debtService.getDebtHistoryForUser = originalMethod;
         }
 
+        errorHandler(
+            propagatedError,
+            {},
+            response,
+            () => {}
+        );
+
         assert.equal(result.statusCode, 403);
-        assert.deepEqual(result.body, { error: 'Acceso denegado' });
+        assert.deepEqual(result.body, {
+            success: false,
+            error: {
+                code: 'FORBIDDEN',
+                message: 'Acceso denegado'
+            }
+        });
     });
 });

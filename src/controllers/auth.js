@@ -1,18 +1,11 @@
 const authService = require('../services/authService');
-const {response}= require('express')
+const { asyncHandler } = require('../middlewares/asyncHandler');
 
-const login = async (req, res=response) => {
-    try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email y contraseña son obligatorios' });
-        }
+const login = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const token = await authService.login(email, password);
 
-        const token = await authService.login(email, password);
-        res.status(200).json({ token });
-    } catch (error) {
-        res.status(401).json({ message: error.message });
-    }
-};
+    res.status(200).json({ token });
+});
 
 module.exports = { login };
