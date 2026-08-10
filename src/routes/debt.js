@@ -1,7 +1,16 @@
 // src/routes/debt.js
 const { Router } = require('express');
-const { check } = require('express-validator');
-const { validateForms, authVerify } = require('../middlewares');
+const {
+    allowOnlyFields,
+    authVerify,
+    validateForms
+} = require('../middlewares');
+const {
+    createDebtValidators,
+    debtIdValidators,
+    updateDebtValidators
+} = require('../validators/debtValidators');
+const { groupCodeValidators } = require('../validators/groupValidators');
 
 const {
     getAllDebts,
@@ -20,13 +29,12 @@ const router = Router();
 // Todas las operaciones de deudas y pagos requieren un JWT válido.
 router.use(authVerify);
 
-router.get('/summary', [
-    validateForms
-], getDebtSummary);
+router.get('/summary', getDebtSummary);
 
 router.get('/history', getDebtHistory);
 
 router.get('/group/:groupCode', [
+    ...groupCodeValidators,
     validateForms
 ], getDebtsInGroup);
 
@@ -34,28 +42,38 @@ router.get('/group/:groupCode', [
 // 2. Rutas dinámicas (que usan un parámetro como :id)
 // se definen DESPUÉS de las rutas específicas.
 
-router.get('/:id', getDebtById);
+router.get('/:id', [
+    ...debtIdValidators,
+    validateForms
+], getDebtById);
 
 
 // --- Resto de las rutas ---
 
-router.get('/', [ 
-    validateForms
-], getAllDebts);
+router.get('/', getAllDebts);
 
-router.post('/', [ 
-    check('description','la descripcion es obligatoria').not().isEmpty(),
+router.post('/', [
+    allowOnlyFields(['description', 'value', 'group', 'debtor']),
+    ...createDebtValidators,
     validateForms
 ], createDebt);
 
-router.put('/:id',[ 
+router.put('/:id', [
+    allowOnlyFields(['description']),
+    ...updateDebtValidators,
     validateForms
 ], updateDebt);
 
-router.put('/pay/:id',[ 
+router.put('/pay/:id', [
+    allowOnlyFields([]),
+    ...debtIdValidators,
     validateForms
 ], markAsPay);
 
-router.delete('/:id', deleteDebt);
+router.delete('/:id', [
+    allowOnlyFields([]),
+    ...debtIdValidators,
+    validateForms
+], deleteDebt);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const { createHttpError } = require('../helpers/httpError');
+const { buildRequestDto } = require('../dtos/requestDto');
 
 const validateForms = ( req, res, next ) => {
 
@@ -20,6 +21,7 @@ const validateForms = ( req, res, next ) => {
         ));
     }
 
+    req.validated = buildRequestDto(req);
     return next();
 }
 

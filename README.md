@@ -182,6 +182,54 @@ Solo estas operaciones son públicas:
 
 Las demás rutas de usuarios, grupos y deudas requieren un JWT válido.
 
+## Validación y DTO de entrada
+
+Los controladores no consumen directamente `req.body`, `req.params` o
+`req.query`. Antes de ejecutar un caso de uso, la solicitud atraviesa este
+flujo:
+
+```text
+Campos permitidos
+        |
+        v
+Validación y sanitización
+        |
+        v
+DTO de entrada
+        |
+        v
+Controlador y servicio
+```
+
+Los textos se recortan con `trim`, los parámetros `:id` se validan como
+ObjectId y el valor de una deuda válida se convierte a número. Los DTO crean
+objetos nuevos y únicamente conservan los campos declarados para la operación.
+Los términos de búsqueda admiten entre 2 y 50 caracteres y sus símbolos de
+expresión regular se escapan para tratarlos como texto literal.
+
+Contratos de body:
+
+| Operación | Campos permitidos |
+|---|---|
+| Login | `email`, `password` |
+| Registrar usuario | `name`, `nickname`, `email`, `password` |
+| Buscar por nickname | `nick` |
+| Actualizar usuario | `name`, `nickname`, `email` |
+| Crear grupo | `name` |
+| Actualizar grupo | `name` |
+| Agregar integrante | `groupCode`, `userNick` |
+| Crear deuda | `description`, `value`, `group`, `debtor` |
+| Actualizar deuda | `description` |
+| Pagar o eliminar recursos | Ninguno |
+
+Si el cliente envía un campo fuera del contrato, la API responde `400` con
+el código `UNKNOWN_FIELDS`. Campos internos como `state`, `owe`, `owes`,
+`creditor`, `debtDate` y `paymentDate` nunca forman parte de los DTO públicos.
+
+La validación HTTP comprueba estructura, tipos y formatos. Las reglas que
+dependen del estado de la aplicación permanecen en los servicios; por ejemplo,
+pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
+
 ## Reglas de autorización
 
 ### Usuarios
@@ -418,6 +466,10 @@ Cobertura inicial:
 - Ocultamiento de mensajes y detalles técnicos en errores internos.
 - Propagación de excepciones asíncronas.
 - Errores JSON para rutas inexistentes y validaciones.
+- Validación de body y parámetros por endpoint.
+- Rechazo de campos desconocidos antes de consultar MongoDB.
+- Sanitización, conversión de tipos y DTO de entrada.
+- Bloqueo de campos internos en usuarios, grupos y deudas.
 - Protección global de rutas.
 - Propiedad del perfil y bloqueo de campos sensibles.
 - Membresía y administración de grupos.
@@ -476,6 +528,24 @@ Los errores de validación incluyen una lista `details`:
 
 Los valores enviados por el cliente, incluidas las contraseñas, no se incluyen
 en `details`.
+
+Los campos que no pertenecen al contrato del endpoint producen:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UNKNOWN_FIELDS",
+    "message": "La solicitud contiene campos no permitidos.",
+    "details": [
+      {
+        "path": "state",
+        "location": "body"
+      }
+    ]
+  }
+}
+```
 
 La API utiliza principalmente:
 

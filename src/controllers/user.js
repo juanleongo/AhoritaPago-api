@@ -1,5 +1,10 @@
 const userService = require('../services/userService');
 const { asyncHandler } = require('../middlewares/asyncHandler');
+const {
+    createUserDto,
+    nicknameLookupDto,
+    updateUserDto
+} = require('../dtos/userDtos');
 
 const getAllUsers = asyncHandler(async (req, res) => {
     const users = await userService.getAllUsers();
@@ -8,7 +13,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
 const getUserById = asyncHandler(async (req, res) => {
     const user = await userService.getUserById(
-        req.params.id,
+        req.validated.params.id,
         req.user.userId
     );
 
@@ -16,7 +21,8 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 const getByNickname = asyncHandler(async (req, res) => {
-    const user = await userService.getByNickname(req.body.nick);
+    const { nick } = nicknameLookupDto(req.validated.body);
+    const user = await userService.getByNickname(nick);
     res.status(200).json(user);
 });
 
@@ -26,7 +32,7 @@ const getUserByToken = asyncHandler(async (req, res) => {
 });
 
 const searchUsers = asyncHandler(async (req, res) => {
-    const { searchTerm } = req.params;
+    const { searchTerm } = req.validated.params;
     const users = await userService.searchUsersByNickname(searchTerm);
 
     res.status(200).json({
@@ -36,14 +42,15 @@ const searchUsers = asyncHandler(async (req, res) => {
 });
 
 const createUser = asyncHandler(async (req, res) => {
-    const newUser = await userService.createUser(req.body);
+    const userData = createUserDto(req.validated.body);
+    const newUser = await userService.createUser(userData);
     res.status(201).json(newUser);
 });
 
 const updateUser = asyncHandler(async (req, res) => {
     const updatedUser = await userService.updateUser(
-        req.params.id,
-        req.body,
+        req.validated.params.id,
+        updateUserDto(req.validated.body),
         req.user.userId
     );
 
@@ -51,7 +58,10 @@ const updateUser = asyncHandler(async (req, res) => {
 });
 
 const deleteUser = asyncHandler(async (req, res) => {
-    await userService.deleteUser(req.params.id, req.user.userId);
+    await userService.deleteUser(
+        req.validated.params.id,
+        req.user.userId
+    );
     res.status(200).json({ message: 'Usuario eliminado correctamente' });
 });
 

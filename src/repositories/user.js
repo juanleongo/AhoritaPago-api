@@ -1,4 +1,5 @@
 const User  = require('../models/user')
+const { escapeRegex } = require('../helpers/escapeRegex');
 
 const getAllUsers = async () => {
     const users = await User.find({ state: true })
@@ -55,7 +56,7 @@ const deleteUser = async (id) => {
 
 const findUsersByNicknameSearch = async (searchTerm) => {
 
-    const regex = new RegExp(searchTerm, 'i');
+    const regex = new RegExp(escapeRegex(searchTerm), 'i');
 
     const users = await User.find({ nickname: regex }).select('nickname name');
     

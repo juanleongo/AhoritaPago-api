@@ -1,5 +1,10 @@
 const groupService = require('../services/groupService');
 const { asyncHandler } = require('../middlewares/asyncHandler');
+const {
+    addGroupMemberDto,
+    createGroupDto,
+    updateGroupDto
+} = require('../dtos/groupDtos');
 
 const getAllGroups = asyncHandler(async (req, res) => {
     const groups = await groupService.getAllGroups(req.user.userId);
@@ -8,7 +13,7 @@ const getAllGroups = asyncHandler(async (req, res) => {
 
 const getGroupById = asyncHandler(async (req, res) => {
     const group = await groupService.getGroupById(
-        req.params.id,
+        req.validated.params.id,
         req.user.userId
     );
 
@@ -21,14 +26,15 @@ const getUserGroups = asyncHandler(async (req, res) => {
 });
 
 const createGroup = asyncHandler(async (req, res) => {
-    const newGroup = await groupService.createGroup(req.body, req.user);
+    const groupData = createGroupDto(req.validated.body);
+    const newGroup = await groupService.createGroup(groupData, req.user);
     res.status(201).json(newGroup);
 });
 
 const updateGroup = asyncHandler(async (req, res) => {
     const updatedGroup = await groupService.updateGroup(
-        req.params.id,
-        req.body,
+        req.validated.params.id,
+        updateGroupDto(req.validated.body),
         req.user.userId
     );
 
@@ -36,12 +42,15 @@ const updateGroup = asyncHandler(async (req, res) => {
 });
 
 const deleteGroup = asyncHandler(async (req, res) => {
-    await groupService.deleteGroup(req.params.id, req.user.userId);
+    await groupService.deleteGroup(
+        req.validated.params.id,
+        req.user.userId
+    );
     res.status(200).json({ message: 'Grupo eliminado correctamente' });
 });
 
 const addMember = asyncHandler(async (req, res) => {
-    const { groupCode, userNick } = req.body;
+    const { groupCode, userNick } = addGroupMemberDto(req.validated.body);
     const result = await groupService.addMemberToGroup(
         groupCode,
         userNick,
