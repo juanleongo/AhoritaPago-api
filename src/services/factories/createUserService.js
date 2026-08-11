@@ -4,7 +4,12 @@ const isSameUser = (userId, authenticatedUserId) => (
     userId.toString() === authenticatedUserId.toString()
 );
 
-const createUserService = ({ userRepository, passwordHasher }) => {
+const createUserService = ({
+    debtRepository,
+    mongoose,
+    passwordHasher,
+    userRepository
+}) => {
     const getAllUsers = async () => userRepository.findAllActive();
 
     const getUserById = async (id, authenticatedUserId) => {
@@ -151,16 +156,47 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const existingUser = await userRepository.findActiveById(id);
-        if (!existingUser) {
-            throw createHttpError(
-                404,
-                'Usuario no encontrado',
-                'USER_NOT_FOUND'
-            );
+        const session = await mongoose.startSession();
+        let deactivatedUser;
+
+        try {
+            await session.withTransaction(async () => {
+                const existingUser = await userRepository.findActiveById(
+                    id,
+                    { session }
+                );
+                if (!existingUser) {
+                    throw createHttpError(
+                        404,
+                        'Usuario no encontrado',
+                        'USER_NOT_FOUND'
+                    );
+                }
+
+                const hasActiveDebts = (
+                    await debtRepository.existsActiveByParticipant(
+                        id,
+                        { session }
+                    )
+                );
+                if (hasActiveDebts) {
+                    throw createHttpError(
+                        409,
+                        'No puedes desactivar tu cuenta mientras tengas deudas activas.',
+                        'USER_HAS_ACTIVE_DEBTS'
+                    );
+                }
+
+                deactivatedUser = await userRepository.deactivateById(
+                    id,
+                    { session }
+                );
+            });
+        } finally {
+            await session.endSession();
         }
 
-        return userRepository.deactivateById(id);
+        return deactivatedUser;
     };
 
     const incrementUserBalances = async (

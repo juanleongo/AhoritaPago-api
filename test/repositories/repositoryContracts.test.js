@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const User = require('../../src/models/user');
 const Group = require('../../src/models/group');
+const Debt = require('../../src/models/debt');
 const userRepository = require('../../src/repositories/user');
 const groupRepository = require('../../src/repositories/group');
 const debtRepository = require('../../src/repositories/debt');
@@ -54,6 +55,7 @@ describe('contratos de repositorios', () => {
         assertContract(debtRepository, [
             'create',
             'deleteById',
+            'existsActiveByParticipant',
             'findActiveByDebtor',
             'findActiveByParticipant',
             'findActiveByParticipantAndGroup',
@@ -103,6 +105,70 @@ describe('contratos de repositorios', () => {
 
         assert.equal(receivedFilter.state, true);
         assert.ok(receivedFilter.nickname instanceof RegExp);
+    });
+
+    it('consulta deudas activas de acreedor y deudor con la sesión', async () => {
+        const originalExists = Debt.exists;
+        const session = { id: 'session-1' };
+        let receivedFilter;
+        let receivedSession;
+
+        Debt.exists = filter => {
+            receivedFilter = filter;
+            return {
+                session(value) {
+                    receivedSession = value;
+                    return this;
+                }
+            };
+        };
+
+        try {
+            assert.equal(
+                await debtRepository.existsActiveByParticipant(
+                    'user-1',
+                    { session }
+                ),
+                true
+            );
+        } finally {
+            Debt.exists = originalExists;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            state: true,
+            $or: [
+                { creditor: 'user-1' },
+                { debtor: 'user-1' }
+            ]
+        });
+        assert.equal(receivedSession, session);
+    });
+
+    it('desactiva únicamente usuarios activos dentro de la sesión', async () => {
+        const originalFindOneAndUpdate = User.findOneAndUpdate;
+        const session = { id: 'session-1' };
+        let receivedOperation;
+
+        User.findOneAndUpdate = (filter, update, options) => {
+            receivedOperation = { filter, update, options };
+            return { _id: filter._id, state: false };
+        };
+
+        try {
+            await userRepository.deactivateById(
+                'user-1',
+                { session }
+            );
+        } finally {
+            User.findOneAndUpdate = originalFindOneAndUpdate;
+        }
+
+        assert.deepEqual(receivedOperation, {
+            filter: { _id: 'user-1', state: true },
+            update: { state: false },
+            options: { new: true, session }
+        });
     });
 
     it('encapsula la incorporación de miembros y evita duplicados', async () => {

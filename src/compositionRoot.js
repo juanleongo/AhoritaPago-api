@@ -11,7 +11,7 @@ const { createAuthService } = require('./services/factories/createAuthService');
 const { createDebtService } = require('./services/debt/createDebtService');
 const { createAuthVerify } = require('./middlewares/authVerify');
 const { createUserController } = require('./controllers/user');
-const { createGroupController } = require('./controllers+/group');
+const { createGroupController } = require('./controllers/group');
 const { createAuthController } = require('./controllers/auth');
 const { createDebtController } = require('./controllers/debt');
 const { createUserRouter } = require('./routes/user');
@@ -44,6 +44,8 @@ const createCompositionRoot = (overrides = {}) => {
 
     const services = {};
     services.user = overrides.services?.user || createUserService({
+        debtRepository: repositories.debt,
+        mongoose: infrastructure.mongoose,
         passwordHasher: infrastructure.passwordHasher,
         userRepository: repositories.user
     });

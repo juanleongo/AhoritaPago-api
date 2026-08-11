@@ -200,7 +200,8 @@ también exponen fábricas para recibir servicios y handlers ya construidos.
 
 Los tres repositorios utilizan la misma convención de nombres:
 
-- `find...` para consultas;
+- `find...` para recuperar registros;
+- `exists...` para comprobaciones booleanas de existencia;
 - `create` para inserciones;
 - `updateById` para actualizaciones;
 - `deactivateById` para eliminaciones lógicas;
@@ -325,6 +326,9 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
   Los saldos, el estado y los demás campos internos conservan los valores
   definidos por el servidor.
 - Un usuario puede consultar, modificar y desactivar únicamente su perfil.
+- Un usuario no puede desactivar su cuenta mientras participe como acreedor o
+  deudor en alguna deuda activa. La API responde `409` con el código
+  `USER_HAS_ACTIVE_DEBTS` hasta que esas obligaciones se paguen o eliminen.
 - La edición del perfil permite `name`, `nickname` y `email`.
 - `owe`, `owes`, `state` y `password` no se pueden modificar directamente.
 
@@ -529,13 +533,16 @@ físicamente no forman parte del historial.
 
 ## Consistencia financiera
 
-Crear, pagar y eliminar deudas utiliza sesiones y transacciones de MongoDB.
+Crear, pagar y eliminar deudas, así como desactivar una cuenta, utiliza
+sesiones y transacciones de MongoDB.
 
 - Si todas las operaciones funcionan, se confirma la transacción.
 - Si alguna operación falla, MongoDB revierte documentos y saldos.
 - El pago de una deuda no puede procesarse dos veces.
 - Eliminar una deuda activa revierte `owe` y `owes`.
 - Eliminar una deuda pagada no vuelve a modificar los saldos.
+- La desactivación consulta las deudas activas y modifica el usuario dentro de
+  la misma transacción, evitando cuentas inactivas con obligaciones abiertas.
 
 ## Pruebas automatizadas
 
@@ -571,6 +578,7 @@ Cobertura inicial:
 - Propagación de sesiones.
 - Commit y abort de transacciones.
 - Reversión de saldos al eliminar deudas.
+- Bloqueo transaccional de la desactivación cuando existen deudas activas.
 
 Ejecutar:
 

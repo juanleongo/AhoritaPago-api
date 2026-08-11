@@ -25,6 +25,21 @@ const findById = async (id, options = {}) => (
     applySession(Debt.findById(id), options)
 );
 
+const existsActiveByParticipant = async (userId, options = {}) => {
+    const existingDebt = await applySession(
+        Debt.exists({
+            state: true,
+            $or: [
+                { creditor: userId },
+                { debtor: userId }
+            ]
+        }),
+        options
+    );
+
+    return Boolean(existingDebt);
+};
+
 const findActiveByDebtor = async (userId, options = {}) => (
     applySession(
         Debt.find({ debtor: userId, state: true })
@@ -88,6 +103,7 @@ const findActiveByParticipantAndGroup = async (
 module.exports = {
     create,
     deleteById,
+    existsActiveByParticipant,
     findActiveByDebtor,
     findActiveByParticipant,
     findActiveByParticipantAndGroup,

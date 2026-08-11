@@ -67,8 +67,8 @@ const updateById = async (id, updateData, options = {}) => (
 );
 
 const deactivateById = async (id, options = {}) => (
-    User.findByIdAndUpdate(
-        id,
+    User.findOneAndUpdate(
+        { _id: id, state: true },
         { state: false },
         buildWriteOptions(options, { new: true })
     )
