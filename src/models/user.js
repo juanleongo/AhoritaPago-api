@@ -42,6 +42,11 @@ const UserSchema = Schema({
 
 })
 
+UserSchema.index(
+    { state: 1, nickname: 1, _id: 1 },
+    { name: 'user_state_nickname' }
+)
+
 //sobre escribir el metodo toJSON, para mostrar solo la formacion que quiero
 
 UserSchema.methods.toJSON = function (){

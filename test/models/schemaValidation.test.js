@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const Debt = require('../../src/models/debt');
 const Group = require('../../src/models/group');
+const User = require('../../src/models/user');
 
 const ids = {
     creditor: '507f1f77bcf86cd799439011',
@@ -85,5 +86,60 @@ describe('integridad de los esquemas Mongoose', () => {
         assert.equal(group.name, 'Viaje');
         assert.notEqual(Group.schema.path('name').options.unique, true);
         assert.equal(Group.schema.path('code').options.unique, true);
+    });
+
+    it('declara índices para historial, participantes y grupos', () => {
+        const indexes = new Map(
+            Debt.schema.indexes().map(([fields, options]) => [
+                options.name,
+                fields
+            ])
+        );
+
+        assert.deepEqual(
+            indexes.get('debt_creditor_state_debt_date'),
+            { creditor: 1, state: 1, debtDate: -1, _id: -1 }
+        );
+        assert.deepEqual(
+            indexes.get('debt_debtor_state_debt_date'),
+            { debtor: 1, state: 1, debtDate: -1, _id: -1 }
+        );
+        assert.deepEqual(
+            indexes.get('debt_creditor_state_payment_date'),
+            {
+                creditor: 1,
+                state: 1,
+                paymentDate: -1,
+                debtDate: -1,
+                _id: -1
+            }
+        );
+        assert.deepEqual(
+            indexes.get('debt_debtor_state_payment_date'),
+            {
+                debtor: 1,
+                state: 1,
+                paymentDate: -1,
+                debtDate: -1,
+                _id: -1
+            }
+        );
+        assert.deepEqual(
+            indexes.get('debt_group_state_creditor'),
+            { group: 1, state: 1, creditor: 1 }
+        );
+        assert.deepEqual(
+            indexes.get('debt_group_state_debtor'),
+            { group: 1, state: 1, debtor: 1 }
+        );
+    });
+
+    it('declara un índice para búsqueda y orden de nicknames activos', () => {
+        const index = User.schema.indexes().find(
+            ([, options]) => options.name === 'user_state_nickname'
+        );
+
+        assert.ok(index);
+        assert.deepEqual(index[0], { state: 1, nickname: 1, _id: 1 });
     });
 });

@@ -1,4 +1,6 @@
 const { createHttpError } = require('../../helpers/httpError');
+const { PAGINATION } = require('../../config/pagination');
+const { createPaginationMetadata } = require('../../helpers/pagination');
 
 const isSameUser = (userId, authenticatedUserId) => (
     userId.toString() === authenticatedUserId.toString()
@@ -46,7 +48,7 @@ const createUserService = ({
         return user;
     };
 
-    const searchUsersByNickname = async searchTerm => {
+    const searchUsersByNickname = async (searchTerm, pagination = {}) => {
         if (!searchTerm || searchTerm.trim().length < 2) {
             throw createHttpError(
                 400,
@@ -55,7 +57,21 @@ const createUserService = ({
             );
         }
 
-        return userRepository.searchActiveByNickname(searchTerm);
+        const page = pagination.page ?? PAGINATION.defaultPage;
+        const limit = pagination.limit ?? PAGINATION.defaultLimit;
+        const [results, count] = await Promise.all([
+            userRepository.searchActiveByNickname(
+                searchTerm,
+                { page, limit }
+            ),
+            userRepository.countActiveByNickname(searchTerm)
+        ]);
+
+        return {
+            count,
+            pagination: createPaginationMetadata(count, page, limit),
+            results
+        };
     };
 
     const getUserByToken = async token => {

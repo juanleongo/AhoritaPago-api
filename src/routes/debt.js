@@ -11,6 +11,9 @@ const {
     updateDebtValidators
 } = require('../validators/debtValidators');
 const { groupCodeValidators } = require('../validators/groupValidators');
+const {
+    historyPaginationValidators
+} = require('../validators/paginationValidators');
 
 const createDebtRouter = ({ authVerify, debtController }) => {
     const router = Router();
@@ -18,7 +21,11 @@ const createDebtRouter = ({ authVerify, debtController }) => {
     router.use(authVerify);
 
     router.get('/summary', debtController.getDebtSummary);
-    router.get('/history', debtController.getDebtHistory);
+    router.get('/history', [
+        allowOnlyFields(['activePage', 'paidPage', 'limit'], 'query'),
+        ...historyPaginationValidators,
+        validateForms
+    ], debtController.getDebtHistory);
     router.get('/group/:groupCode', [
         ...groupCodeValidators,
         validateForms

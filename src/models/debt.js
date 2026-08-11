@@ -84,4 +84,41 @@ const DebtSchema = new Schema({
     }
 });
 
+DebtSchema.index(
+    { creditor: 1, state: 1, debtDate: -1, _id: -1 },
+    { name: 'debt_creditor_state_debt_date' }
+);
+DebtSchema.index(
+    { debtor: 1, state: 1, debtDate: -1, _id: -1 },
+    { name: 'debt_debtor_state_debt_date' }
+);
+DebtSchema.index(
+    {
+        creditor: 1,
+        state: 1,
+        paymentDate: -1,
+        debtDate: -1,
+        _id: -1
+    },
+    { name: 'debt_creditor_state_payment_date' }
+);
+DebtSchema.index(
+    {
+        debtor: 1,
+        state: 1,
+        paymentDate: -1,
+        debtDate: -1,
+        _id: -1
+    },
+    { name: 'debt_debtor_state_payment_date' }
+);
+DebtSchema.index(
+    { group: 1, state: 1, creditor: 1 },
+    { name: 'debt_group_state_creditor' }
+);
+DebtSchema.index(
+    { group: 1, state: 1, debtor: 1 },
+    { name: 'debt_group_state_debtor' }
+);
+
 module.exports = model('Debt', DebtSchema);

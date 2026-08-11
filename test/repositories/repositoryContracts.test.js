@@ -22,6 +22,7 @@ const assertContract = (repository, expectedMethods) => {
 describe('contratos de repositorios', () => {
     it('expone un contrato uniforme para usuarios', () => {
         assertContract(userRepository, [
+            'countActiveByNickname',
             'create',
             'deactivateById',
             'findActiveById',
@@ -52,6 +53,7 @@ describe('contratos de repositorios', () => {
 
     it('expone un contrato uniforme para deudas', () => {
         assertContract(debtRepository, [
+            'countHistoryByParticipant',
             'create',
             'deleteById',
             'existsActiveByParticipant',
@@ -85,7 +87,20 @@ describe('contratos de repositorios', () => {
     it('filtra por estado activo al buscar usuarios por nickname', async () => {
         const originalFind = User.find;
         let receivedFilter;
+        const receivedQuery = {};
         const query = {
+            sort(value) {
+                receivedQuery.sort = value;
+                return this;
+            },
+            skip(value) {
+                receivedQuery.skip = value;
+                return this;
+            },
+            limit(value) {
+                receivedQuery.limit = value;
+                return this;
+            },
             select() {
                 return this;
             }
@@ -97,13 +112,126 @@ describe('contratos de repositorios', () => {
         };
 
         try {
-            await userRepository.searchActiveByNickname('ana');
+            await userRepository.searchActiveByNickname(
+                'ana',
+                { page: 2, limit: 5 }
+            );
         } finally {
             User.find = originalFind;
         }
 
         assert.equal(receivedFilter.state, true);
         assert.ok(receivedFilter.nickname instanceof RegExp);
+        assert.deepEqual(receivedQuery, {
+            sort: { nickname: 1, _id: 1 },
+            skip: 5,
+            limit: 5
+        });
+    });
+
+    it('cuenta usuarios con el mismo filtro de búsqueda activa', async () => {
+        const originalCountDocuments = User.countDocuments;
+        let receivedFilter;
+
+        User.countDocuments = filter => {
+            receivedFilter = filter;
+            return 4;
+        };
+
+        try {
+            assert.equal(
+                await userRepository.countActiveByNickname('ana'),
+                4
+            );
+        } finally {
+            User.countDocuments = originalCountDocuments;
+        }
+
+        assert.equal(receivedFilter.state, true);
+        assert.ok(receivedFilter.nickname instanceof RegExp);
+        assert.equal(receivedFilter.nickname.test('Diana'), true);
+    });
+
+    it('pagina y ordena el historial en MongoDB según su estado', async () => {
+        const originalFind = Debt.find;
+        const operations = [];
+        let receivedFilter;
+        const query = {
+            sort(value) {
+                operations.push(['sort', value]);
+                return this;
+            },
+            skip(value) {
+                operations.push(['skip', value]);
+                return this;
+            },
+            limit(value) {
+                operations.push(['limit', value]);
+                return this;
+            },
+            populate() {
+                return this;
+            }
+        };
+
+        Debt.find = filter => {
+            receivedFilter = filter;
+            return query;
+        };
+
+        try {
+            await debtRepository.findHistoryByParticipant(
+                '507f1f77bcf86cd799439011',
+                { state: false, page: 3, limit: 10 }
+            );
+        } finally {
+            Debt.find = originalFind;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            state: false,
+            $or: [
+                { creditor: '507f1f77bcf86cd799439011' },
+                { debtor: '507f1f77bcf86cd799439011' }
+            ]
+        });
+        assert.deepEqual(operations, [
+            ['sort', {
+                paymentDate: -1,
+                debtDate: -1,
+                _id: -1
+            }],
+            ['skip', 20],
+            ['limit', 10]
+        ]);
+    });
+
+    it('cuenta el historial con el mismo filtro de participante y estado', async () => {
+        const originalCountDocuments = Debt.countDocuments;
+        let receivedFilter;
+
+        Debt.countDocuments = filter => {
+            receivedFilter = filter;
+            return 7;
+        };
+
+        try {
+            assert.equal(
+                await debtRepository.countHistoryByParticipant(
+                    '507f1f77bcf86cd799439011',
+                    { state: true }
+                ),
+                7
+            );
+        } finally {
+            Debt.countDocuments = originalCountDocuments;
+        }
+
+        assert.equal(receivedFilter.state, true);
+        assert.deepEqual(receivedFilter.$or, [
+            { creditor: '507f1f77bcf86cd799439011' },
+            { debtor: '507f1f77bcf86cd799439011' }
+        ]);
     });
 
     it('consulta deudas activas de acreedor y deudor con la sesión', async () => {

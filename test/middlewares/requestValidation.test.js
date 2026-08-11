@@ -7,6 +7,10 @@ const {
     searchUsersValidators,
     userIdValidators
 } = require('../../src/validators/userValidators');
+const {
+    historyPaginationValidators,
+    searchPaginationValidators
+} = require('../../src/validators/paginationValidators');
 
 const runValidation = async (validators, requestData) => {
     const req = {
@@ -140,6 +144,44 @@ describe('validación y DTO de solicitud', () => {
         assert.equal(result.error.details[0].path, 'searchTerm');
     });
 
+    it('aplica la paginación predeterminada del historial', async () => {
+        const result = await runValidation(historyPaginationValidators, {
+            query: {}
+        });
+
+        assert.equal(result.nextCalled, true);
+        assert.deepEqual(result.req.validated.query, {
+            activePage: 1,
+            paidPage: 1,
+            limit: 20
+        });
+    });
+
+    it('convierte la paginación de búsqueda a números', async () => {
+        const result = await runValidation(searchPaginationValidators, {
+            query: { page: '3', limit: '25' }
+        });
+
+        assert.equal(result.nextCalled, true);
+        assert.deepEqual(result.req.validated.query, {
+            page: 3,
+            limit: 25
+        });
+    });
+
+    it('rechaza páginas inválidas y límites mayores que 50', async () => {
+        const result = await runValidation(searchPaginationValidators, {
+            query: { page: '0', limit: '51' }
+        });
+
+        assert.equal(result.nextCalled, false);
+        assert.equal(result.error.errorCode, 'VALIDATION_ERROR');
+        assert.deepEqual(
+            result.error.details.map(detail => detail.path).sort(),
+            ['limit', 'page']
+        );
+    });
+
     it('rechaza campos desconocidos con detalles seguros', () => {
         const req = {
             body: {
@@ -159,6 +201,23 @@ describe('validación y DTO de solicitud', () => {
         assert.deepEqual(middlewareError.details, [
             { path: 'state', location: 'body' },
             { path: 'owe', location: 'body' }
+        ]);
+    });
+
+    it('rechaza parámetros de query desconocidos', () => {
+        const req = {
+            query: { page: '1', sortBy: 'password' }
+        };
+        let middlewareError;
+
+        allowOnlyFields(['page'], 'query')(req, {}, error => {
+            middlewareError = error;
+        });
+
+        assert.equal(middlewareError.statusCode, 400);
+        assert.equal(middlewareError.errorCode, 'UNKNOWN_FIELDS');
+        assert.deepEqual(middlewareError.details, [
+            { path: 'sortBy', location: 'query' }
         ]);
     });
 });

@@ -169,14 +169,17 @@ Responsabilidad de cada carpeta:
 ```text
 src/
 ├── audits/        Consultas no destructivas de integridad de datos
+├── config/        Valores configurables y límites de la aplicación
 ├── controllers/   Traducción entre HTTP y los casos de uso
 ├── db/            Conexión con MongoDB
+├── dtos/          Contratos de entrada para controladores
 ├── helpers/       Utilidades y errores HTTP
 ├── middlewares/   JWT y validación de formularios
 ├── models/        Esquemas de Mongoose y servidor Express
 ├── repositories/  Consultas y escrituras en MongoDB
 ├── routes/        Definición de endpoints
-└── services/      Reglas de negocio y autorización
+├── services/      Reglas de negocio y autorización
+└── validators/    Validación y sanitización de solicitudes
 
 test/
 ├── audits/        Pruebas de reportes de integridad
@@ -225,6 +228,7 @@ también exponen fábricas para recibir servicios y handlers ya construidos.
 Los tres repositorios utilizan la misma convención de nombres:
 
 - `find...` para recuperar registros;
+- `count...` para contar registros sin cargarlos en memoria;
 - `exists...` para comprobaciones booleanas de existencia;
 - `create` para inserciones;
 - `updateById` para actualizaciones;
@@ -234,9 +238,10 @@ Los tres repositorios utilizan la misma convención de nombres:
 Todas las operaciones aceptan un objeto `options` como último argumento. Una
 sesión de MongoDB se entrega siempre como `{ session }`; no se usan argumentos
 posicionales distintos entre repositorios. Los filtros forman parte del nombre
-del método: por ejemplo, `findActiveById`, `findActiveByParticipant` y
-`findHistoryByParticipant` hacen explícito si se consultan registros activos o
-el historial completo.
+del método: por ejemplo, `findActiveById` y `findActiveByParticipant` hacen
+explícito si se consultan registros activos. El historial recibe un objeto de
+consulta con estado, página y límite; el repositorio aplica filtro,
+ordenamiento y paginación antes de recuperar documentos.
 
 Las operaciones de persistencia también quedan dentro del repositorio. Por
 ejemplo, el servicio de grupos usa `addMemberById` y no modifica documentos de
@@ -505,7 +510,7 @@ Ejemplo:
 | `GET` | `/api/user` | Consulta el perfil del JWT. |
 | `GET` | `/api/user/:id` | Consulta el perfil propio por ID. |
 | `GET` | `/api/user/nick` | Busca un usuario por nickname enviado como `nick`. |
-| `GET` | `/api/user/search/:searchTerm` | Busca nicknames parcialmente. |
+| `GET` | `/api/user/search/:searchTerm` | Busca nicknames parcialmente con paginación. |
 | `PUT` | `/api/user/:id` | Actualiza el perfil propio. |
 | `DELETE` | `/api/user/:id` | Desactiva el perfil propio. |
 
@@ -519,6 +524,34 @@ Registro:
   "password": "contraseña-segura"
 }
 ```
+
+Búsqueda paginada:
+
+```http
+GET /api/user/search/leo?page=1&limit=20
+Authorization: Bearer <token>
+```
+
+La respuesta conserva `results` y agrega el total y los metadatos de página:
+
+```json
+{
+  "msg": "Resultados de la búsqueda para 'leo'",
+  "count": 21,
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalPages": 2,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  },
+  "results": []
+}
+```
+
+Los resultados se ordenan por `nickname` y luego por `_id`, ambos de forma
+ascendente. `page` empieza en `1`; `limit` utiliza `20` por defecto y admite
+como máximo `50` resultados.
 
 ### Grupos
 
@@ -558,7 +591,7 @@ documentos de deuda.
 |---|---|---|
 | `GET` | `/api/payment` | Lista deudas activas del usuario como deudor. |
 | `GET` | `/api/payment/summary` | Resumen de deudas y créditos activos. |
-| `GET` | `/api/payment/history` | Historial activo y pagado. |
+| `GET` | `/api/payment/history` | Historial activo y pagado con páginas independientes. |
 | `GET` | `/api/payment/group/:groupCode` | Deudas activas del usuario en un grupo. |
 | `GET` | `/api/payment/:id` | Consulta una deuda como acreedor o deudor. |
 | `POST` | `/api/payment` | Crea una deuda. |
@@ -588,7 +621,7 @@ cada deudor.
 Solicitud:
 
 ```http
-GET /api/payment/history
+GET /api/payment/history?activePage=1&paidPage=1&limit=20
 Authorization: Bearer <token>
 ```
 
@@ -600,6 +633,22 @@ Respuesta:
     "total": 2,
     "active": 1,
     "paid": 1
+  },
+  "pagination": {
+    "active": {
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    },
+    "paid": {
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
   },
   "active": [
     {
@@ -626,6 +675,32 @@ Respuesta:
 Las deudas activas se ordenan por `debtDate` y las pagadas por `paymentDate`,
 siempre desde la más reciente hasta la más antigua. Las deudas eliminadas
 físicamente no forman parte del historial.
+
+`activePage` y `paidPage` permiten avanzar cada lista de manera independiente.
+Todos los parámetros son opcionales: las páginas empiezan en `1`, el límite
+predeterminado es `20` y el máximo permitido es `50`. Los conteos representan
+todos los documentos encontrados, no solamente los de la página actual.
+
+## Índices y consultas paginadas
+
+El historial se filtra, ordena y pagina en MongoDB mediante `sort`, `skip` y
+`limit`; el servicio no carga la colección completa ni la ordena en memoria.
+Los esquemas declaran índices compuestos para:
+
+- acreedor o deudor, estado y fecha de creación;
+- acreedor o deudor, estado y fecha de pago;
+- grupo, estado y cada tipo de participante;
+- estado y nickname del usuario.
+
+El orden incluye `_id` como criterio de desempate para que una página sea
+determinista cuando varios documentos tienen la misma fecha o nickname. Los
+índices nuevos no son únicos y no eliminan índices existentes.
+
+La búsqueda parcial conserva la expresión regular insensible a mayúsculas para
+no cambiar su comportamiento. La paginación limita la respuesta, pero una
+expresión regular no anclada todavía puede examinar muchos usuarios. Si el
+volumen crece significativamente, conviene evaluar búsqueda por prefijo sobre
+un campo normalizado o MongoDB Atlas Search.
 
 ## Consistencia financiera
 
@@ -665,6 +740,9 @@ Cobertura inicial:
 - Membresía y administración de grupos.
 - Incorporación de integrantes.
 - Separación y orden del historial.
+- Paginación independiente, conteos totales y ordenamiento en MongoDB.
+- Paginación y orden estable de búsquedas parciales por nickname.
+- Definición de índices compuestos para deudas y usuarios.
 - Compatibilidad de la fachada y separación de casos de uso de deudas.
 - Propagación de dependencias desde composition root hasta routers.
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.

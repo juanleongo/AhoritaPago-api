@@ -1,6 +1,7 @@
 const debtService = require('../services/debtservice');
 const { asyncHandler } = require('../middlewares/asyncHandler');
 const { createDebtDto, updateDebtDto } = require('../dtos/debtDtos');
+const { historyPaginationDto } = require('../dtos/paginationDtos');
 
 const createDebtController = ({ debtService }) => {
     const getAllDebts = asyncHandler(async (req, res) => {
@@ -68,18 +69,11 @@ const createDebtController = ({ debtService }) => {
 
     const getDebtHistory = asyncHandler(async (req, res) => {
         const history = await debtService.getDebtHistoryForUser(
-            req.user.userId
+            req.user.userId,
+            historyPaginationDto(req.validated?.query)
         );
 
-        res.status(200).json({
-            count: {
-                total: history.active.length + history.paid.length,
-                active: history.active.length,
-                paid: history.paid.length
-            },
-            active: history.active,
-            paid: history.paid
-        });
+        res.status(200).json(history);
     });
 
     const getDebtsInGroup = asyncHandler(async (req, res) => {

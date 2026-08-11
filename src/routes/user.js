@@ -13,6 +13,9 @@ const {
     updateUserValidators,
     userIdValidators
 } = require('../validators/userValidators');
+const {
+    searchPaginationValidators
+} = require('../validators/paginationValidators');
 
 const createUserRouter = ({
     authVerify,
@@ -37,7 +40,9 @@ const createUserRouter = ({
         validateForms
     ], userController.getByNickname);
     router.get('/search/:searchTerm', [
+        allowOnlyFields(['page', 'limit'], 'query'),
         ...searchUsersValidators,
+        ...searchPaginationValidators,
         validateForms
     ], userController.searchUsers);
     router.get('/:id', [

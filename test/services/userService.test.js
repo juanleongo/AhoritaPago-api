@@ -22,6 +22,45 @@ const withRepositoryStubs = async (stubs, work) => {
 };
 
 describe('userService: autorización y campos permitidos', () => {
+    it('pagina la búsqueda por nickname y devuelve el total', async () => {
+        const calls = [];
+
+        await withRepositoryStubs(
+            {
+                searchActiveByNickname: async (term, pagination) => {
+                    calls.push(['search', term, pagination]);
+                    return [{ nickname: 'leon' }];
+                },
+                countActiveByNickname: async term => {
+                    calls.push(['count', term]);
+                    return 21;
+                }
+            },
+            async () => {
+                const result = await userService.searchUsersByNickname(
+                    'leo',
+                    { page: 2, limit: 10 }
+                );
+
+                assert.deepEqual(calls, [
+                    ['search', 'leo', { page: 2, limit: 10 }],
+                    ['count', 'leo']
+                ]);
+                assert.deepEqual(result, {
+                    count: 21,
+                    pagination: {
+                        page: 2,
+                        limit: 10,
+                        totalPages: 3,
+                        hasNextPage: true,
+                        hasPreviousPage: true
+                    },
+                    results: [{ nickname: 'leon' }]
+                });
+            }
+        );
+    });
+
     it('el registro descarta campos internos y cifra la contraseña', async () => {
         let persistedData;
 

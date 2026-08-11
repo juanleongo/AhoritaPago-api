@@ -29,9 +29,31 @@ const createResponse = () => {
 describe('debtController: historial', () => {
     it('devuelve conteos y listas separadas en formato JSON', async () => {
         const originalMethod = debtService.getDebtHistoryForUser;
-        debtService.getDebtHistoryForUser = async userId => {
+        debtService.getDebtHistoryForUser = async (userId, pagination) => {
             assert.equal(userId, 'user-1');
+            assert.deepEqual(pagination, {
+                activePage: 2,
+                paidPage: 1,
+                limit: 5
+            });
             return {
+                count: { total: 3, active: 1, paid: 2 },
+                pagination: {
+                    active: {
+                        page: 2,
+                        limit: 5,
+                        totalPages: 1,
+                        hasNextPage: false,
+                        hasPreviousPage: true
+                    },
+                    paid: {
+                        page: 1,
+                        limit: 5,
+                        totalPages: 1,
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    }
+                },
                 active: [{ id: 'active-1' }],
                 paid: [{ id: 'paid-1' }, { id: 'paid-2' }]
             };
@@ -41,7 +63,12 @@ describe('debtController: historial', () => {
 
         try {
             await getDebtHistory(
-                { user: { userId: 'user-1' } },
+                {
+                    user: { userId: 'user-1' },
+                    validated: {
+                        query: { activePage: 2, paidPage: 1, limit: 5 }
+                    }
+                },
                 response
             );
         } finally {
@@ -54,6 +81,22 @@ describe('debtController: historial', () => {
                 total: 3,
                 active: 1,
                 paid: 2
+            },
+            pagination: {
+                active: {
+                    page: 2,
+                    limit: 5,
+                    totalPages: 1,
+                    hasNextPage: false,
+                    hasPreviousPage: true
+                },
+                paid: {
+                    page: 1,
+                    limit: 5,
+                    totalPages: 1,
+                    hasNextPage: false,
+                    hasPreviousPage: false
+                }
             },
             active: [{ id: 'active-1' }],
             paid: [{ id: 'paid-1' }, { id: 'paid-2' }]

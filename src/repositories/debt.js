@@ -3,6 +3,21 @@ const {
     applySession,
     buildWriteOptions
 } = require('./repositoryOptions');
+const { getPaginationOffset } = require('../helpers/pagination');
+
+const historyFilter = (userId, state) => ({
+    state,
+    $or: [
+        { creditor: userId },
+        { debtor: userId }
+    ]
+});
+
+const historySort = state => (
+    state
+        ? { debtDate: -1, _id: -1 }
+        : { paymentDate: -1, debtDate: -1, _id: -1 }
+);
 
 const create = async (debtData, options = {}) => {
     const debt = new Debt(debtData);
@@ -65,14 +80,27 @@ const findActiveByParticipant = async (userId, options = {}) => (
     )
 );
 
-const findHistoryByParticipant = async (userId, options = {}) => (
+const countHistoryByParticipant = async (
+    userId,
+    { state },
+    options = {}
+) => (
     applySession(
-        Debt.find({
-            $or: [
-                { creditor: userId },
-                { debtor: userId }
-            ]
-        })
+        Debt.countDocuments(historyFilter(userId, state)),
+        options
+    )
+);
+
+const findHistoryByParticipant = async (
+    userId,
+    { state, page, limit },
+    options = {}
+) => (
+    applySession(
+        Debt.find(historyFilter(userId, state))
+            .sort(historySort(state))
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit)
             .populate('group', 'name code')
             .populate('creditor', 'name nickname')
             .populate('debtor', 'name nickname'),
@@ -101,6 +129,7 @@ const findActiveByParticipantAndGroup = async (
 );
 
 module.exports = {
+    countHistoryByParticipant,
     create,
     deleteById,
     existsActiveByParticipant,

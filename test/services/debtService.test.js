@@ -42,51 +42,100 @@ const createSession = () => ({
 });
 
 describe('debtService: historial y consistencia financiera', () => {
-    it('divide y ordena el historial desde la fecha más reciente', async () => {
+    it('consulta páginas separadas y devuelve totales del historial', async () => {
+        const receivedQueries = [];
+
         await withStubs(
             debtRepository,
             {
-                findHistoryByParticipant: async userId => {
+                findHistoryByParticipant: async (userId, query) => {
                     assert.equal(userId, 'user-1');
-                    return [
-                        {
-                            id: 'active-old',
-                            state: true,
-                            debtDate: new Date('2026-01-10')
-                        },
-                        {
-                            id: 'paid-old',
-                            state: false,
-                            debtDate: new Date('2026-01-01'),
-                            paymentDate: new Date('2026-02-15')
-                        },
-                        {
-                            id: 'active-new',
-                            state: true,
-                            debtDate: new Date('2026-05-20')
-                        },
-                        {
-                            id: 'paid-new',
-                            state: false,
-                            debtDate: new Date('2026-03-01'),
-                            paymentDate: new Date('2026-06-30')
-                        }
-                    ];
+                    receivedQueries.push(['find', query]);
+                    return query.state
+                        ? [{ id: 'active-page-item' }]
+                        : [{ id: 'paid-page-item' }];
+                },
+                countHistoryByParticipant: async (userId, query) => {
+                    assert.equal(userId, 'user-1');
+                    receivedQueries.push(['count', query]);
+                    return query.state ? 5 : 3;
                 }
+            },
+            async () => {
+                const history = await debtService.getDebtHistoryForUser(
+                    'user-1',
+                    { activePage: 2, paidPage: 1, limit: 2 }
+                );
+
+                assert.deepEqual(receivedQueries, [
+                    ['find', { state: true, page: 2, limit: 2 }],
+                    ['find', { state: false, page: 1, limit: 2 }],
+                    ['count', { state: true }],
+                    ['count', { state: false }]
+                ]);
+                assert.deepEqual(history, {
+                    count: { total: 8, active: 5, paid: 3 },
+                    pagination: {
+                        active: {
+                            page: 2,
+                            limit: 2,
+                            totalPages: 3,
+                            hasNextPage: true,
+                            hasPreviousPage: true
+                        },
+                        paid: {
+                            page: 1,
+                            limit: 2,
+                            totalPages: 2,
+                            hasNextPage: true,
+                            hasPreviousPage: false
+                        }
+                    },
+                    active: [{ id: 'active-page-item' }],
+                    paid: [{ id: 'paid-page-item' }]
+                });
+            }
+        );
+    });
+
+    it('usa la primera página y representa un historial vacío', async () => {
+        await withStubs(
+            debtRepository,
+            {
+                findHistoryByParticipant: async (userId, query) => {
+                    assert.equal(userId, 'user-1');
+                    assert.equal(query.page, 1);
+                    assert.equal(query.limit, 20);
+                    return [];
+                },
+                countHistoryByParticipant: async () => 0
             },
             async () => {
                 const history = await debtService.getDebtHistoryForUser(
                     'user-1'
                 );
 
-                assert.deepEqual(
-                    history.active.map(debt => debt.id),
-                    ['active-new', 'active-old']
-                );
-                assert.deepEqual(
-                    history.paid.map(debt => debt.id),
-                    ['paid-new', 'paid-old']
-                );
+                assert.deepEqual(history, {
+                    count: { total: 0, active: 0, paid: 0 },
+                    pagination: {
+                        active: {
+                            page: 1,
+                            limit: 20,
+                            totalPages: 0,
+                            hasNextPage: false,
+                            hasPreviousPage: false
+                        },
+                        paid: {
+                            page: 1,
+                            limit: 20,
+                            totalPages: 0,
+                            hasNextPage: false,
+                            hasPreviousPage: false
+                        }
+                    },
+                    active: [],
+                    paid: []
+                });
             }
         );
     });

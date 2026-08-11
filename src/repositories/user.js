@@ -4,6 +4,12 @@ const {
     applySession,
     buildWriteOptions
 } = require('./repositoryOptions');
+const { getPaginationOffset } = require('../helpers/pagination');
+
+const activeNicknameFilter = searchTerm => ({
+    nickname: new RegExp(escapeRegex(searchTerm), 'i'),
+    state: true
+});
 
 const findAllActive = async (options = {}) => (
     applySession(User.find({ state: true }), options)
@@ -38,14 +44,27 @@ const findActiveByNickname = async (nickname, options = {}) => (
     )
 );
 
-const searchActiveByNickname = async (searchTerm, options = {}) => {
-    const regex = new RegExp(escapeRegex(searchTerm), 'i');
-
-    return applySession(
-        User.find({ nickname: regex, state: true }).select('nickname name'),
+const countActiveByNickname = async (searchTerm, options = {}) => (
+    applySession(
+        User.countDocuments(activeNicknameFilter(searchTerm)),
         options
-    );
-};
+    )
+);
+
+const searchActiveByNickname = async (
+    searchTerm,
+    { page, limit },
+    options = {}
+) => (
+    applySession(
+        User.find(activeNicknameFilter(searchTerm))
+            .sort({ nickname: 1, _id: 1 })
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit)
+            .select('nickname name'),
+        options
+    )
+);
 
 const create = async (userData, options = {}) => {
     if (!options.session) {
@@ -75,6 +94,7 @@ const deactivateById = async (id, options = {}) => (
 );
 
 module.exports = {
+    countActiveByNickname,
     create,
     deactivateById,
     findActiveById,

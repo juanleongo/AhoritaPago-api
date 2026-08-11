@@ -16,13 +16,14 @@ const middlewareNamesFor = (router, method, path) => {
 };
 
 describe('cobertura de validación en rutas', () => {
-    it('protege todos los contratos de body con lista de campos y validación', () => {
+    it('protege los contratos de body y query con lista de campos', () => {
         const routes = [
             [authRouter, 'post', '/login'],
             [userRouter, 'post', '/'],
             [userRouter, 'get', '/nick'],
             [userRouter, 'put', '/:id'],
             [userRouter, 'delete', '/:id'],
+            [userRouter, 'get', '/search/:searchTerm'],
             [groupRouter, 'post', '/'],
             [groupRouter, 'post', '/addMember'],
             [groupRouter, 'put', '/:id'],
@@ -30,7 +31,8 @@ describe('cobertura de validación en rutas', () => {
             [debtRouter, 'post', '/'],
             [debtRouter, 'put', '/:id'],
             [debtRouter, 'put', '/pay/:id'],
-            [debtRouter, 'delete', '/:id']
+            [debtRouter, 'delete', '/:id'],
+            [debtRouter, 'get', '/history']
         ];
 
         routes.forEach(([router, method, path]) => {

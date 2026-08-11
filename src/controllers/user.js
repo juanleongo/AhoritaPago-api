@@ -5,6 +5,7 @@ const {
     nicknameLookupDto,
     updateUserDto
 } = require('../dtos/userDtos');
+const { searchPaginationDto } = require('../dtos/paginationDtos');
 
 const createUserController = ({ userService }) => {
     const getAllUsers = asyncHandler(async (req, res) => {
@@ -34,11 +35,14 @@ const createUserController = ({ userService }) => {
 
     const searchUsers = asyncHandler(async (req, res) => {
         const { searchTerm } = req.validated.params;
-        const users = await userService.searchUsersByNickname(searchTerm);
+        const search = await userService.searchUsersByNickname(
+            searchTerm,
+            searchPaginationDto(req.validated?.query)
+        );
 
         res.status(200).json({
             msg: `Resultados de la búsqueda para '${searchTerm}'`,
-            results: users
+            ...search
         });
     });
 

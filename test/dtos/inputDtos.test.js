@@ -12,6 +12,10 @@ const {
     nicknameLookupDto,
     updateUserDto
 } = require('../../src/dtos/userDtos');
+const {
+    historyPaginationDto,
+    searchPaginationDto
+} = require('../../src/dtos/paginationDtos');
 
 describe('DTO de entrada', () => {
     it('el DTO de autenticación conserva solo credenciales', () => {
@@ -100,6 +104,18 @@ describe('DTO de entrada', () => {
             state: false
         }), {
             description: 'Cena actualizada'
+        });
+    });
+
+    it('los DTO de paginación aplican valores predeterminados', () => {
+        assert.deepEqual(historyPaginationDto({ activePage: 3 }), {
+            activePage: 3,
+            paidPage: 1,
+            limit: 20
+        });
+        assert.deepEqual(searchPaginationDto({ page: 2, limit: 10 }), {
+            page: 2,
+            limit: 10
         });
     });
 });
