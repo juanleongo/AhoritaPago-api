@@ -334,6 +334,9 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 
 ### Grupos
 
+- Al crear un grupo se realizan hasta cinco intentos para generar un código
+  disponible. Cada código se consulta nuevamente y el índice único de MongoDB
+  resuelve posibles colisiones concurrentes antes de reintentar.
 - Los integrantes pueden consultar el grupo y agregar personas.
 - Solo el administrador puede modificar o eliminar el grupo.
 - Un usuario externo no puede consultar ni administrar el grupo.
@@ -574,6 +577,7 @@ Cobertura inicial:
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
 - Contratos, filtros activos y opciones de sesión de los repositorios.
 - Persistencia de integrantes encapsulada en el repositorio de grupos.
+- Reintentos limitados y colisiones concurrentes al generar códigos de grupo.
 - Inyección directa de conexión y puerto en `Server`.
 - Propagación de sesiones.
 - Commit y abort de transacciones.

@@ -1,5 +1,19 @@
 const { createHttpError } = require('../../helpers/httpError');
 
+const MAX_GROUP_CODE_ATTEMPTS = 5;
+
+const isGroupCodeDuplicateError = error => (
+    error?.code === 11000
+    && (
+        error.keyPattern?.code
+        || Object.prototype.hasOwnProperty.call(
+            error.keyValue || {},
+            'code'
+        )
+        || error.message?.includes('code_1')
+    )
+);
+
 const isSameId = (firstId, secondId) => (
     firstId && secondId && firstId.toString() === secondId.toString()
 );
@@ -72,23 +86,37 @@ const createGroupService = ({
             );
         }
 
-        let code = generateRandomCode();
-        const existingCode = await groupRepository.findByCode(code);
-        while (existingCode) {
-            code = generateRandomCode();
-            throw createHttpError(
-                409,
-                'El código generado para el grupo ya está en uso',
-                'GROUP_CODE_CONFLICT'
-            );
+        for (
+            let attempt = 0;
+            attempt < MAX_GROUP_CODE_ATTEMPTS;
+            attempt += 1
+        ) {
+            const code = generateRandomCode();
+            const existingCode = await groupRepository.findByCode(code);
+
+            if (existingCode) {
+                continue;
+            }
+
+            try {
+                return await groupRepository.create({
+                    name: groupData.name,
+                    admin: userData.userId,
+                    code,
+                    members: userData.userId
+                });
+            } catch (error) {
+                if (!isGroupCodeDuplicateError(error)) {
+                    throw error;
+                }
+            }
         }
 
-        return groupRepository.create({
-            name: groupData.name,
-            admin: userData.userId,
-            code,
-            members: userData.userId
-        });
+        throw createHttpError(
+            409,
+            'No fue posible generar un código único para el grupo',
+            'GROUP_CODE_CONFLICT'
+        );
     };
 
     const updateGroup = async (id, groupData, authenticatedUserId) => {
