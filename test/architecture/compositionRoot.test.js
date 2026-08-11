@@ -55,9 +55,11 @@ const createInjectedDependencies = () => {
             config: createTestAppConfig(),
             generateRandomCode: () => 'ABC123',
             getJwtSecret: () => 'injected-secret',
-            mongoose: {},
             passwordHasher,
-            tokenProvider
+            tokenProvider,
+            transactionManager: {
+                runInTransaction: work => work({ id: 'transaction-1' })
+            }
         }
     });
 
@@ -107,6 +109,65 @@ describe('composition root e inyección de dependencias', () => {
                 { expiresIn: '4h' }
             ]
         ]);
+    });
+
+    it('inyecta el administrador de transacciones en los casos de uso', async () => {
+        const transaction = { id: 'transaction-1' };
+        const calls = [];
+        const transactionManager = {
+            async runInTransaction(work) {
+                calls.push('runInTransaction');
+                return work(transaction);
+            }
+        };
+        const root = createCompositionRoot({
+            infrastructure: {
+                config: createTestAppConfig(),
+                transactionManager
+            },
+            repositories: {
+                debt: {
+                    async create(data, options) {
+                        assert.deepEqual(options, { transaction });
+                        return data;
+                    }
+                },
+                group: {
+                    async findActiveById(id, options) {
+                        assert.deepEqual(options, { transaction });
+                        return {
+                            state: true,
+                            members: ['creditor', 'debtor']
+                        };
+                    }
+                },
+                user: {}
+            },
+            services: {
+                user: {
+                    async incrementUserBalances(id, changes, context) {
+                        assert.equal(context, transaction);
+                    }
+                }
+            }
+        });
+
+        const result = await root.services.debt.createDebt(
+            {
+                description: 'Cena',
+                value: 20,
+                group: 'group-1',
+                debtor: ['debtor']
+            },
+            { userId: 'creditor' }
+        );
+
+        assert.equal(
+            root.infrastructure.transactionManager,
+            transactionManager
+        );
+        assert.equal(result.length, 1);
+        assert.deepEqual(calls, ['runInTransaction']);
     });
 
     it('inyecta JWT y repositorio en el middleware de autenticación', async () => {

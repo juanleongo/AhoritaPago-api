@@ -4,23 +4,25 @@ const {
     createUserService
 } = require('../../src/services/factories/createUserService');
 
-const createSession = () => ({
-    aborted: false,
-    committed: false,
-    ended: false,
-    async withTransaction(work) {
-        try {
-            await work();
-            this.committed = true;
-        } catch (error) {
-            this.aborted = true;
-            throw error;
+const createTestTransactionManager = calls => {
+    const transaction = { id: 'transaction-1' };
+    const state = { aborted: false, committed: false };
+    const transactionManager = {
+        async runInTransaction(work) {
+            calls.push(['runInTransaction']);
+            try {
+                const result = await work(transaction);
+                state.committed = true;
+                return result;
+            } catch (error) {
+                state.aborted = true;
+                throw error;
+            }
         }
-    },
-    async endSession() {
-        this.ended = true;
-    }
-});
+    };
+
+    return { state, transaction, transactionManager };
+};
 
 const createDependencies = ({
     deactivate = async id => ({ _id: id, state: false }),
@@ -28,7 +30,9 @@ const createDependencies = ({
     hasActiveDebts = false
 } = {}) => {
     const calls = [];
-    const session = createSession();
+    const { state, transaction, transactionManager } = (
+        createTestTransactionManager(calls)
+    );
     const service = createUserService({
         debtRepository: {
             async existsActiveByParticipant(id, options) {
@@ -36,13 +40,8 @@ const createDependencies = ({
                 return hasActiveDebts;
             }
         },
-        mongoose: {
-            async startSession() {
-                calls.push(['startSession']);
-                return session;
-            }
-        },
         passwordHasher: {},
+        transactionManager,
         userRepository: {
             async deactivateById(id, options) {
                 calls.push(['deactivateById', id, options]);
@@ -55,11 +54,11 @@ const createDependencies = ({
         }
     });
 
-    return { calls, service, session };
+    return { calls, service, state, transaction };
 };
 
 describe('userService: desactivación segura', () => {
-    it('rechaza desactivar una cuenta distinta antes de abrir sesión', async () => {
+    it('rechaza una cuenta distinta antes de abrir la transacción', async () => {
         const { calls, service } = createDependencies();
 
         await assert.rejects(
@@ -74,7 +73,7 @@ describe('userService: desactivación segura', () => {
     });
 
     it('devuelve 404 si el usuario ya no está activo', async () => {
-        const { calls, service, session } = createDependencies({
+        const { calls, service, state } = createDependencies({
             existingUser: null
         });
 
@@ -86,8 +85,7 @@ describe('userService: desactivación segura', () => {
             )
         );
 
-        assert.equal(session.aborted, true);
-        assert.equal(session.ended, true);
+        assert.equal(state.aborted, true);
         assert.equal(
             calls.some(([operation]) => (
                 operation === 'existsActiveByParticipant'
@@ -98,7 +96,7 @@ describe('userService: desactivación segura', () => {
     });
 
     it('rechaza con 409 una cuenta que participa en deudas activas', async () => {
-        const { calls, service, session } = createDependencies({
+        const { calls, service, state } = createDependencies({
             hasActiveDebts: true
         });
 
@@ -110,33 +108,31 @@ describe('userService: desactivación segura', () => {
             )
         );
 
-        assert.equal(session.aborted, true);
-        assert.equal(session.ended, true);
+        assert.equal(state.aborted, true);
         assert.equal(
             calls.some(([operation]) => operation === 'deactivateById'),
             false
         );
     });
 
-    it('desactiva la cuenta sin deudas usando una sola sesión', async () => {
-        const { calls, service, session } = createDependencies();
+    it('desactiva la cuenta usando un único contexto', async () => {
+        const { calls, service, state, transaction } = createDependencies();
 
         const result = await service.deleteUser('user-1', 'user-1');
 
         assert.deepEqual(result, { _id: 'user-1', state: false });
-        assert.equal(session.committed, true);
-        assert.equal(session.ended, true);
+        assert.equal(state.committed, true);
         assert.deepEqual(calls, [
-            ['startSession'],
-            ['findActiveById', 'user-1', { session }],
-            ['existsActiveByParticipant', 'user-1', { session }],
-            ['deactivateById', 'user-1', { session }]
+            ['runInTransaction'],
+            ['findActiveById', 'user-1', { transaction }],
+            ['existsActiveByParticipant', 'user-1', { transaction }],
+            ['deactivateById', 'user-1', { transaction }]
         ]);
     });
 
-    it('aborta y cierra la sesión si falla la desactivación', async () => {
+    it('aborta la transacción si falla la desactivación', async () => {
         const failure = new Error('Fallo simulado');
-        const { service, session } = createDependencies({
+        const { service, state } = createDependencies({
             deactivate: async () => {
                 throw failure;
             }
@@ -147,8 +143,7 @@ describe('userService: desactivación segura', () => {
             failure
         );
 
-        assert.equal(session.aborted, true);
-        assert.equal(session.committed, false);
-        assert.equal(session.ended, true);
+        assert.equal(state.aborted, true);
+        assert.equal(state.committed, false);
     });
 });

@@ -1,43 +1,43 @@
 const Group = require('../models/group');
 const {
-    applySession,
+    applyTransaction,
     buildWriteOptions
 } = require('./repositoryOptions');
 
 const findAllActive = async (options = {}) => (
-    applySession(Group.find({ state: true }), options)
+    applyTransaction(Group.find({ state: true }), options)
 );
 
 const findAllActiveByUser = async (userId, options = {}) => (
-    applySession(
+    applyTransaction(
         Group.find({ members: userId, state: true }),
         options
     )
 );
 
 const findById = async (id, options = {}) => (
-    applySession(Group.findById(id), options)
+    applyTransaction(Group.findById(id), options)
 );
 
 const findActiveById = async (id, options = {}) => (
-    applySession(Group.findOne({ _id: id, state: true }), options)
+    applyTransaction(Group.findOne({ _id: id, state: true }), options)
 );
 
 const findByCode = async (code, options = {}) => (
-    applySession(Group.findOne({ code }), options)
+    applyTransaction(Group.findOne({ code }), options)
 );
 
 const findActiveByCode = async (code, options = {}) => (
-    applySession(Group.findOne({ code, state: true }), options)
+    applyTransaction(Group.findOne({ code, state: true }), options)
 );
 
 const create = async (groupData, options = {}) => {
-    if (!options.session) {
+    if (!options.transaction) {
         return Group.create(groupData);
     }
 
     const [group] = await Group.create([groupData], {
-        session: options.session
+        session: options.transaction
     });
     return group;
 };

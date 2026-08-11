@@ -8,8 +8,8 @@ const isSameUser = (userId, authenticatedUserId) => (
 
 const createUserService = ({
     debtRepository,
-    mongoose,
     passwordHasher,
+    transactionManager,
     userRepository
 }) => {
     const getAllUsers = async () => userRepository.findAllActive();
@@ -172,57 +172,45 @@ const createUserService = ({
             );
         }
 
-        const session = await mongoose.startSession();
-        let deactivatedUser;
+        return transactionManager.runInTransaction(async transaction => {
+            const existingUser = await userRepository.findActiveById(
+                id,
+                { transaction }
+            );
+            if (!existingUser) {
+                throw createHttpError(
+                    404,
+                    'Usuario no encontrado',
+                    'USER_NOT_FOUND'
+                );
+            }
 
-        try {
-            await session.withTransaction(async () => {
-                const existingUser = await userRepository.findActiveById(
+            const hasActiveDebts = (
+                await debtRepository.existsActiveByParticipant(
                     id,
-                    { session }
+                    { transaction }
+                )
+            );
+            if (hasActiveDebts) {
+                throw createHttpError(
+                    409,
+                    'No puedes desactivar tu cuenta mientras tengas deudas activas.',
+                    'USER_HAS_ACTIVE_DEBTS'
                 );
-                if (!existingUser) {
-                    throw createHttpError(
-                        404,
-                        'Usuario no encontrado',
-                        'USER_NOT_FOUND'
-                    );
-                }
+            }
 
-                const hasActiveDebts = (
-                    await debtRepository.existsActiveByParticipant(
-                        id,
-                        { session }
-                    )
-                );
-                if (hasActiveDebts) {
-                    throw createHttpError(
-                        409,
-                        'No puedes desactivar tu cuenta mientras tengas deudas activas.',
-                        'USER_HAS_ACTIVE_DEBTS'
-                    );
-                }
-
-                deactivatedUser = await userRepository.deactivateById(
-                    id,
-                    { session }
-                );
-            });
-        } finally {
-            await session.endSession();
-        }
-
-        return deactivatedUser;
+            return userRepository.deactivateById(id, { transaction });
+        });
     };
 
     const incrementUserBalances = async (
         id,
         balanceChanges,
-        session = null
+        transaction = null
     ) => {
         const existingUser = await userRepository.findActiveById(
             id,
-            { session }
+            { transaction }
         );
         if (!existingUser) {
             throw createHttpError(
@@ -250,7 +238,7 @@ const createUserService = ({
         return userRepository.updateById(
             id,
             { $inc: safeChanges },
-            { session }
+            { transaction }
         );
     };
 

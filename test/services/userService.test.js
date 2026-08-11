@@ -150,13 +150,13 @@ describe('userService: autorización y campos permitidos', () => {
     });
 
     it('solo permite incrementos internos de owe y owes', async () => {
-        const session = { id: 'session-1' };
+        const transaction = { id: 'transaction-1' };
         let persistedUpdate;
 
         await withRepositoryStubs(
             {
                 findActiveById: async (id, options) => {
-                    assert.deepEqual(options, { session });
+                    assert.deepEqual(options, { transaction });
                     return { _id: id };
                 },
                 updateById: async (id, data, options) => {
@@ -168,7 +168,7 @@ describe('userService: autorización y campos permitidos', () => {
                 await userService.incrementUserBalances(
                     'user-1',
                     { owe: 20, state: 1 },
-                    session
+                    transaction
                 );
             }
         );
@@ -176,7 +176,7 @@ describe('userService: autorización y campos permitidos', () => {
         assert.deepEqual(persistedUpdate, {
             id: 'user-1',
             data: { $inc: { owe: 20 } },
-            options: { session }
+            options: { transaction }
         });
     });
 });

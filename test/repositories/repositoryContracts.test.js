@@ -7,7 +7,7 @@ const userRepository = require('../../src/repositories/user');
 const groupRepository = require('../../src/repositories/group');
 const debtRepository = require('../../src/repositories/debt');
 const {
-    applySession,
+    applyTransaction,
     buildWriteOptions
 } = require('../../src/repositories/repositoryOptions');
 
@@ -66,8 +66,8 @@ describe('contratos de repositorios', () => {
         ]);
     });
 
-    it('propaga la sesión mediante un objeto options común', () => {
-        const session = { id: 'session-1' };
+    it('traduce el contexto transaccional a una sesión de Mongoose', () => {
+        const transaction = { id: 'transaction-1' };
         const query = {
             receivedSession: null,
             session(receivedSession) {
@@ -76,11 +76,11 @@ describe('contratos de repositorios', () => {
             }
         };
 
-        assert.equal(applySession(query, { session }), query);
-        assert.equal(query.receivedSession, session);
+        assert.equal(applyTransaction(query, { transaction }), query);
+        assert.equal(query.receivedSession, transaction);
         assert.deepEqual(
-            buildWriteOptions({ session }, { new: true }),
-            { new: true, session }
+            buildWriteOptions({ transaction }, { new: true }),
+            { new: true, session: transaction }
         );
     });
 
@@ -234,9 +234,9 @@ describe('contratos de repositorios', () => {
         ]);
     });
 
-    it('consulta deudas activas de acreedor y deudor con la sesión', async () => {
+    it('consulta deudas activas dentro de la transacción', async () => {
         const originalExists = Debt.exists;
-        const session = { id: 'session-1' };
+        const transaction = { id: 'transaction-1' };
         let receivedFilter;
         let receivedSession;
 
@@ -254,7 +254,7 @@ describe('contratos de repositorios', () => {
             assert.equal(
                 await debtRepository.existsActiveByParticipant(
                     'user-1',
-                    { session }
+                    { transaction }
                 ),
                 true
             );
@@ -269,12 +269,12 @@ describe('contratos de repositorios', () => {
                 { debtor: 'user-1' }
             ]
         });
-        assert.equal(receivedSession, session);
+        assert.equal(receivedSession, transaction);
     });
 
-    it('desactiva únicamente usuarios activos dentro de la sesión', async () => {
+    it('desactiva únicamente usuarios activos en la transacción', async () => {
         const originalFindOneAndUpdate = User.findOneAndUpdate;
-        const session = { id: 'session-1' };
+        const transaction = { id: 'transaction-1' };
         let receivedOperation;
 
         User.findOneAndUpdate = (filter, update, options) => {
@@ -285,7 +285,7 @@ describe('contratos de repositorios', () => {
         try {
             await userRepository.deactivateById(
                 'user-1',
-                { session }
+                { transaction }
             );
         } finally {
             User.findOneAndUpdate = originalFindOneAndUpdate;
@@ -294,13 +294,13 @@ describe('contratos de repositorios', () => {
         assert.deepEqual(receivedOperation, {
             filter: { _id: 'user-1', state: true },
             update: { state: false },
-            options: { new: true, session }
+            options: { new: true, session: transaction }
         });
     });
 
     it('encapsula la incorporación de miembros y evita duplicados', async () => {
         const originalFindByIdAndUpdate = Group.findByIdAndUpdate;
-        const session = { id: 'session-1' };
+        const transaction = { id: 'transaction-1' };
         let receivedOperation;
 
         Group.findByIdAndUpdate = (id, update, options) => {
@@ -312,7 +312,7 @@ describe('contratos de repositorios', () => {
             await groupRepository.addMemberById(
                 'group-1',
                 'user-1',
-                { session }
+                { transaction }
             );
         } finally {
             Group.findByIdAndUpdate = originalFindByIdAndUpdate;
@@ -321,7 +321,11 @@ describe('contratos de repositorios', () => {
         assert.deepEqual(receivedOperation, {
             id: 'group-1',
             update: { $addToSet: { members: 'user-1' } },
-            options: { new: true, runValidators: true, session }
+            options: {
+                new: true,
+                runValidators: true,
+                session: transaction
+            }
         });
     });
 });

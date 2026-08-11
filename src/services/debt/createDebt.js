@@ -69,7 +69,7 @@ const createCreateDebt = ({
     debtAccess,
     debtRepository,
     groupRepository,
-    mongoose,
+    transactionManager,
     userService
 }) => {
     const assertGroupParticipants = (
@@ -111,56 +111,48 @@ const createCreateDebt = ({
         const creditorId = creditorData.userId;
         const debtorIds = validateDebtInput(debtData, creditorId);
         const totalCreditValue = value * debtorIds.length;
-        const session = await mongoose.startSession();
-        let createdDebts = [];
 
-        try {
-            await session.withTransaction(async () => {
-                const targetGroup = await groupRepository.findActiveById(
+        return transactionManager.runInTransaction(async transaction => {
+            const targetGroup = await groupRepository.findActiveById(
+                group,
+                { transaction }
+            );
+
+            assertGroupParticipants(targetGroup, creditorId, debtorIds);
+
+            const transactionDebts = [];
+
+            for (const debtorId of debtorIds) {
+                const newDebtData = {
+                    description,
+                    value,
+                    debtor: [debtorId],
                     group,
-                    { session }
+                    debtDate: Date.now(),
+                    creditor: creditorId
+                };
+
+                const createdDebt = await debtRepository.create(
+                    newDebtData,
+                    { transaction }
                 );
-
-                assertGroupParticipants(targetGroup, creditorId, debtorIds);
-
-                const transactionDebts = [];
-
-                for (const debtorId of debtorIds) {
-                    const newDebtData = {
-                        description,
-                        value,
-                        debtor: [debtorId],
-                        group,
-                        debtDate: Date.now(),
-                        creditor: creditorId
-                    };
-
-                    const createdDebt = await debtRepository.create(
-                        newDebtData,
-                        { session }
-                    );
-                    transactionDebts.push(createdDebt);
-
-                    await userService.incrementUserBalances(
-                        debtorId,
-                        { owe: value },
-                        session
-                    );
-                }
+                transactionDebts.push(createdDebt);
 
                 await userService.incrementUserBalances(
-                    creditorId,
-                    { owes: totalCreditValue },
-                    session
+                    debtorId,
+                    { owe: value },
+                    transaction
                 );
+            }
 
-                createdDebts = transactionDebts;
-            });
-        } finally {
-            await session.endSession();
-        }
+            await userService.incrementUserBalances(
+                creditorId,
+                { owes: totalCreditValue },
+                transaction
+            );
 
-        return createdDebts;
+            return transactionDebts;
+        });
     };
 
     return createDebt;

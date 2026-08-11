@@ -225,6 +225,7 @@ Responsabilidad de cada carpeta:
 
 ```text
 src/
+├── adapters/      Implementaciones de infraestructura para contratos internos
 ├── audits/        Consultas no destructivas de integridad de datos
 ├── config/        Valores configurables y límites de la aplicación
 ├── controllers/   Traducción entre HTTP y los casos de uso
@@ -273,7 +274,7 @@ El composition root construye e inyecta:
 - repositorios de usuarios, grupos y deudas;
 - bcrypt como proveedor de contraseñas;
 - JWT y la función que obtiene el secreto;
-- Mongoose para los casos de uso transaccionales;
+- un administrador de transacciones implementado mediante Mongoose;
 - servicios, middleware de autenticación, controladores y routers.
 
 Los servicios no reciben estas dependencias desde variables globales dentro de
@@ -293,13 +294,29 @@ Los tres repositorios utilizan la misma convención de nombres:
 - `deactivateById` para eliminaciones lógicas;
 - `deleteById` solo cuando la eliminación es física.
 
-Todas las operaciones aceptan un objeto `options` como último argumento. Una
-sesión de MongoDB se entrega siempre como `{ session }`; no se usan argumentos
-posicionales distintos entre repositorios. Los filtros forman parte del nombre
-del método: por ejemplo, `findActiveById` y `findActiveByParticipant` hacen
-explícito si se consultan registros activos. El historial recibe un objeto de
-consulta con estado, página y límite; el repositorio aplica filtro,
-ordenamiento y paginación antes de recuperar documentos.
+Todas las operaciones aceptan un objeto `options` como último argumento. El
+contexto genérico se entrega como `{ transaction }`; los repositorios lo
+traducen a la sesión que necesita Mongoose. No se usan argumentos posicionales
+distintos entre repositorios. Los filtros forman parte del nombre del método:
+por ejemplo, `findActiveById` y `findActiveByParticipant` hacen explícito si se
+consultan registros activos. El historial recibe un objeto de consulta con
+estado, página y límite; el repositorio aplica filtro, ordenamiento y
+paginación antes de recuperar documentos.
+
+### Administrador de transacciones
+
+Los casos de uso dependen únicamente de este contrato:
+
+```js
+transactionManager.runInTransaction(work)
+```
+
+`work` recibe un contexto transaccional opaco que puede propagarse a otros
+servicios y repositorios. El adaptador
+`src/adapters/mongooseTransactionManager.js` es el único responsable de abrir
+la sesión, ejecutar `withTransaction` y cerrar la sesión incluso cuando ocurre
+un error. De esta forma, crear, pagar o eliminar deudas y desactivar usuarios
+no depende de la API concreta de Mongoose.
 
 Las operaciones de persistencia también quedan dentro del repositorio. Por
 ejemplo, el servicio de grupos usa `addMemberById` y no modifica documentos de
@@ -763,7 +780,8 @@ un campo normalizado o MongoDB Atlas Search.
 ## Consistencia financiera
 
 Crear, pagar y eliminar deudas, así como desactivar una cuenta, utiliza
-sesiones y transacciones de MongoDB.
+el contrato `transactionManager.runInTransaction(work)`. Su adaptador de
+infraestructura utiliza sesiones y transacciones de MongoDB.
 
 - Si todas las operaciones funcionan, se confirma la transacción.
 - Si alguna operación falla, MongoDB revierte documentos y saldos.
@@ -776,8 +794,9 @@ sesiones y transacciones de MongoDB.
 ## Pruebas automatizadas
 
 La suite utiliza `node:test` y no necesita una conexión real a MongoDB. Los
-repositorios y las sesiones se sustituyen por implementaciones controladas
-durante cada prueba.
+repositorios y el administrador de transacciones se sustituyen por
+implementaciones controladas durante las pruebas de los casos de uso. El ciclo
+de sesiones de Mongoose se comprueba por separado en las pruebas del adaptador.
 
 Cobertura inicial:
 
@@ -804,14 +823,14 @@ Cobertura inicial:
 - Compatibilidad de la fachada y separación de casos de uso de deudas.
 - Propagación de dependencias desde composition root hasta routers.
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
-- Contratos, filtros activos y opciones de sesión de los repositorios.
+- Contratos, filtros activos y contexto transaccional de los repositorios.
 - Persistencia de integrantes encapsulada en el repositorio de grupos.
 - Reintentos limitados y colisiones concurrentes al generar códigos de grupo.
 - Reglas de deuda alineadas entre HTTP, servicios y Mongoose.
 - Nombres de grupo repetibles y auditoría no destructiva de datos históricos.
 - Inyección directa de conexión y puerto en `Server`.
-- Propagación de sesiones.
-- Commit y abort de transacciones.
+- Propagación de un único contexto transaccional.
+- Commit, abort, retorno y cierre de transacciones mediante el adaptador.
 - Reversión de saldos al eliminar deudas.
 - Bloqueo transaccional de la desactivación cuando existen deudas activas.
 - Encabezados de Helmet, CORS local y límite de cuerpos JSON.

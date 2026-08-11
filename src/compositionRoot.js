@@ -1,6 +1,5 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const userRepository = require('./repositories/user');
 const groupRepository = require('./repositories/group');
 const debtRepository = require('./repositories/debt');
@@ -20,6 +19,9 @@ const { createAuthRouter } = require('./routes/auth');
 const { createDebtRouter } = require('./routes/debt');
 const { createHttpSecurity } = require('./middlewares/httpSecurity');
 const { createAppConfig } = require('./config/appConfig');
+const {
+    createMongooseTransactionManager
+} = require('./adapters/mongooseTransactionManager');
 
 const createCompositionRoot = (overrides = {}) => {
     const config = (
@@ -31,6 +33,10 @@ const createCompositionRoot = (overrides = {}) => {
         group: overrides.repositories?.group || groupRepository,
         debt: overrides.repositories?.debt || debtRepository
     };
+    const transactionManager = (
+        overrides.infrastructure?.transactionManager
+        || createMongooseTransactionManager()
+    );
 
     const infrastructure = {
         config,
@@ -38,7 +44,7 @@ const createCompositionRoot = (overrides = {}) => {
             overrides.infrastructure?.passwordHasher || bcrypt
         ),
         tokenProvider: overrides.infrastructure?.tokenProvider || jwt,
-        mongoose: overrides.infrastructure?.mongoose || mongoose,
+        transactionManager,
         generateRandomCode: (
             overrides.infrastructure?.generateRandomCode
             || generateRandomCode
@@ -56,8 +62,8 @@ const createCompositionRoot = (overrides = {}) => {
     const services = {};
     services.user = overrides.services?.user || createUserService({
         debtRepository: repositories.debt,
-        mongoose: infrastructure.mongoose,
         passwordHasher: infrastructure.passwordHasher,
+        transactionManager: infrastructure.transactionManager,
         userRepository: repositories.user
     });
     services.group = overrides.services?.group || createGroupService({
@@ -74,7 +80,7 @@ const createCompositionRoot = (overrides = {}) => {
     services.debt = overrides.services?.debt || createDebtService({
         debtRepository: repositories.debt,
         groupRepository: repositories.group,
-        mongoose: infrastructure.mongoose,
+        transactionManager: infrastructure.transactionManager,
         userService: services.user
     });
 

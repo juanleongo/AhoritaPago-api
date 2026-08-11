@@ -1,6 +1,6 @@
 const Debt = require('../models/debt');
 const {
-    applySession,
+    applyTransaction,
     buildWriteOptions
 } = require('./repositoryOptions');
 const { getPaginationOffset } = require('../helpers/pagination');
@@ -37,11 +37,11 @@ const updateById = async (id, debtData, options = {}) => (
 );
 
 const findById = async (id, options = {}) => (
-    applySession(Debt.findById(id), options)
+    applyTransaction(Debt.findById(id), options)
 );
 
 const existsActiveByParticipant = async (userId, options = {}) => {
-    const existingDebt = await applySession(
+    const existingDebt = await applyTransaction(
         Debt.exists({
             state: true,
             $or: [
@@ -56,7 +56,7 @@ const existsActiveByParticipant = async (userId, options = {}) => {
 };
 
 const findActiveByDebtor = async (userId, options = {}) => (
-    applySession(
+    applyTransaction(
         Debt.find({ debtor: userId, state: true })
             .populate('debtor', 'name')
             .populate('creditor', 'name'),
@@ -65,7 +65,7 @@ const findActiveByDebtor = async (userId, options = {}) => (
 );
 
 const findActiveByParticipant = async (userId, options = {}) => (
-    applySession(
+    applyTransaction(
         Debt.find({
             $or: [
                 { creditor: userId },
@@ -85,7 +85,7 @@ const countHistoryByParticipant = async (
     { state },
     options = {}
 ) => (
-    applySession(
+    applyTransaction(
         Debt.countDocuments(historyFilter(userId, state)),
         options
     )
@@ -96,7 +96,7 @@ const findHistoryByParticipant = async (
     { state, page, limit },
     options = {}
 ) => (
-    applySession(
+    applyTransaction(
         Debt.find(historyFilter(userId, state))
             .sort(historySort(state))
             .skip(getPaginationOffset(page, limit))
@@ -113,7 +113,7 @@ const findActiveByParticipantAndGroup = async (
     groupId,
     options = {}
 ) => (
-    applySession(
+    applyTransaction(
         Debt.find({
             group: groupId,
             state: true,

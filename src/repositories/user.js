@@ -1,7 +1,7 @@
 const User = require('../models/user');
 const { escapeRegex } = require('../helpers/escapeRegex');
 const {
-    applySession,
+    applyTransaction,
     buildWriteOptions
 } = require('./repositoryOptions');
 const { getPaginationOffset } = require('../helpers/pagination');
@@ -12,40 +12,40 @@ const activeNicknameFilter = searchTerm => ({
 });
 
 const findAllActive = async (options = {}) => (
-    applySession(User.find({ state: true }), options)
+    applyTransaction(User.find({ state: true }), options)
 );
 
 const findById = async (id, options = {}) => (
-    applySession(User.findById(id), options)
+    applyTransaction(User.findById(id), options)
 );
 
 const findActiveById = async (id, options = {}) => (
-    applySession(
+    applyTransaction(
         User.findOne({ _id: id, state: true }),
         options
     )
 );
 
 const findByEmail = async (email, options = {}) => (
-    applySession(User.findOne({ email }), options)
+    applyTransaction(User.findOne({ email }), options)
 );
 
 const findByNickname = async (nickname, options = {}) => (
-    applySession(
+    applyTransaction(
         User.findOne({ nickname }).select('nickname name'),
         options
     )
 );
 
 const findActiveByNickname = async (nickname, options = {}) => (
-    applySession(
+    applyTransaction(
         User.findOne({ nickname, state: true }).select('nickname name'),
         options
     )
 );
 
 const countActiveByNickname = async (searchTerm, options = {}) => (
-    applySession(
+    applyTransaction(
         User.countDocuments(activeNicknameFilter(searchTerm)),
         options
     )
@@ -56,7 +56,7 @@ const searchActiveByNickname = async (
     { page, limit },
     options = {}
 ) => (
-    applySession(
+    applyTransaction(
         User.find(activeNicknameFilter(searchTerm))
             .sort({ nickname: 1, _id: 1 })
             .skip(getPaginationOffset(page, limit))
@@ -67,12 +67,12 @@ const searchActiveByNickname = async (
 );
 
 const create = async (userData, options = {}) => {
-    if (!options.session) {
+    if (!options.transaction) {
         return User.create(userData);
     }
 
     const [user] = await User.create([userData], {
-        session: options.session
+        session: options.transaction
     });
     return user;
 };

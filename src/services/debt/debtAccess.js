@@ -16,8 +16,8 @@ const isDebtDebtor = (debt, userId) => (
 );
 
 const createDebtAccess = ({ debtRepository }) => {
-    const getExistingDebt = async (id, session = null) => {
-        const debt = await debtRepository.findById(id, { session });
+    const getExistingDebt = async (id, transaction = null) => {
+        const debt = await debtRepository.findById(id, { transaction });
 
         if (!debt) {
             throw createHttpError(

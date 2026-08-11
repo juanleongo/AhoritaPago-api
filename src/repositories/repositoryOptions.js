@@ -1,20 +1,20 @@
-const applySession = (query, options = {}) => {
-    if (options.session) {
-        return query.session(options.session);
+const applyTransaction = (query, options = {}) => {
+    if (options.transaction) {
+        return query.session(options.transaction);
     }
 
     return query;
 };
 
 const buildWriteOptions = (options = {}, defaults = {}) => {
-    if (!options.session) {
+    if (!options.transaction) {
         return defaults;
     }
 
-    return { ...defaults, session: options.session };
+    return { ...defaults, session: options.transaction };
 };
 
 module.exports = {
-    applySession,
+    applyTransaction,
     buildWriteOptions
 };

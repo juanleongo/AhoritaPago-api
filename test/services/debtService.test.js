@@ -1,10 +1,12 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const mongoose = require('mongoose');
 const debtRepository = require('../../src/repositories/debt');
 const groupRepository = require('../../src/repositories/group');
 const userService = require('../../src/services/userService');
 const debtService = require('../../src/services/debtservice');
+const {
+    createDebtService
+} = require('../../src/services/debt/createDebtService');
 
 const withStubs = async (target, stubs, work) => {
     const originals = {};
@@ -23,22 +25,30 @@ const withStubs = async (target, stubs, work) => {
     }
 };
 
-const createSession = () => ({
-    committed: false,
-    aborted: false,
-    ended: false,
-    async withTransaction(work) {
-        try {
-            await work();
-            this.committed = true;
-        } catch (error) {
-            this.aborted = true;
-            throw error;
+const createTestTransactionManager = () => {
+    const transaction = { id: 'transaction-1' };
+    const state = { aborted: false, committed: false };
+    const transactionManager = {
+        async runInTransaction(work) {
+            try {
+                const result = await work(transaction);
+                state.committed = true;
+                return result;
+            } catch (error) {
+                state.aborted = true;
+                throw error;
+            }
         }
-    },
-    async endSession() {
-        this.ended = true;
-    }
+    };
+
+    return { state, transaction, transactionManager };
+};
+
+const createService = transactionManager => createDebtService({
+    debtRepository,
+    groupRepository,
+    transactionManager,
+    userService
 });
 
 describe('debtService: historial y consistencia financiera', () => {
@@ -141,104 +151,30 @@ describe('debtService: historial y consistencia financiera', () => {
     });
 
     it('crea deuda y saldos dentro de la misma transacción', async () => {
-        const session = createSession();
-        const balanceUpdates = [];
-
-        await withStubs(
-            mongoose,
-            { startSession: async () => session },
-            async () => {
-                await withStubs(
-                    groupRepository,
-                    {
-                        findActiveById: async (id, options) => {
-                            assert.deepEqual(options, { session });
-                            return {
-                                state: true,
-                                members: ['creditor', 'debtor']
-                            };
-                        }
-                    },
-                    async () => {
-                        await withStubs(
-                            debtRepository,
-                            {
-                                create: async (data, options) => {
-                                    assert.deepEqual(options, { session });
-                                    return data;
-                                }
-                            },
-                            async () => {
-                                await withStubs(
-                                    userService,
-                                    {
-                                        incrementUserBalances: async (
-                                            id,
-                                            changes,
-                                            receivedSession
-                                        ) => {
-                                            assert.equal(
-                                                receivedSession,
-                                                session
-                                            );
-                                            balanceUpdates.push({
-                                                id,
-                                                changes
-                                            });
-                                        }
-                                    },
-                                    async () => {
-                                        const debts = await debtService.createDebt(
-                                            {
-                                                description: 'Cena',
-                                                value: 50,
-                                                group: 'group-1',
-                                                debtor: ['debtor']
-                                            },
-                                            { userId: 'creditor' }
-                                        );
-
-                                        assert.equal(debts.length, 1);
-                                    }
-                                );
-                            }
-                        );
-                    }
-                );
-            }
+        const { state, transaction, transactionManager } = (
+            createTestTransactionManager()
         );
-
-        assert.equal(session.committed, true);
-        assert.equal(session.ended, true);
-        assert.deepEqual(balanceUpdates, [
-            { id: 'debtor', changes: { owe: 50 } },
-            { id: 'creditor', changes: { owes: 50 } }
-        ]);
-    });
-
-    it('revierte saldos al eliminar una deuda activa', async () => {
-        const session = createSession();
+        const service = createService(transactionManager);
         const balanceUpdates = [];
 
         await withStubs(
-            mongoose,
-            { startSession: async () => session },
+            groupRepository,
+            {
+                findActiveById: async (id, options) => {
+                    assert.deepEqual(options, { transaction });
+                    return {
+                        state: true,
+                        members: ['creditor', 'debtor']
+                    };
+                }
+            },
             async () => {
                 await withStubs(
                     debtRepository,
                     {
-                        findById: async (id, options) => {
-                            assert.deepEqual(options, { session });
-                            return {
-                            creditor: 'creditor',
-                            debtor: ['debtor'],
-                            value: 30,
-                            state: true
-                            };
-                        },
-                        deleteById: async (id, options) => {
-                            assert.deepEqual(options, { session });
-                            return { _id: id };
+                        create: async (data, options) => {
+                            assert.deepEqual(options, { transaction });
+                            return data;
                         }
                     },
                     async () => {
@@ -248,17 +184,27 @@ describe('debtService: historial y consistencia financiera', () => {
                                 incrementUserBalances: async (
                                     id,
                                     changes,
-                                    receivedSession
+                                    receivedTransaction
                                 ) => {
-                                    assert.equal(receivedSession, session);
+                                    assert.equal(
+                                        receivedTransaction,
+                                        transaction
+                                    );
                                     balanceUpdates.push({ id, changes });
                                 }
                             },
                             async () => {
-                                await debtService.deleteDebt(
-                                    'debt-1',
-                                    'creditor'
+                                const debts = await service.createDebt(
+                                    {
+                                        description: 'Cena',
+                                        value: 50,
+                                        group: 'group-1',
+                                        debtor: ['debtor']
+                                    },
+                                    { userId: 'creditor' }
                                 );
+
+                                assert.equal(debts.length, 1);
                             }
                         );
                     }
@@ -266,55 +212,156 @@ describe('debtService: historial y consistencia financiera', () => {
             }
         );
 
-        assert.equal(session.committed, true);
-        assert.equal(session.ended, true);
+        assert.equal(state.committed, true);
+        assert.deepEqual(balanceUpdates, [
+            { id: 'debtor', changes: { owe: 50 } },
+            { id: 'creditor', changes: { owes: 50 } }
+        ]);
+    });
+
+    it('revierte saldos al eliminar una deuda activa', async () => {
+        const { state, transaction, transactionManager } = (
+            createTestTransactionManager()
+        );
+        const service = createService(transactionManager);
+        const balanceUpdates = [];
+
+        await withStubs(
+            debtRepository,
+            {
+                findById: async (id, options) => {
+                    assert.deepEqual(options, { transaction });
+                    return {
+                        creditor: 'creditor',
+                        debtor: ['debtor'],
+                        value: 30,
+                        state: true
+                    };
+                },
+                deleteById: async (id, options) => {
+                    assert.deepEqual(options, { transaction });
+                    return { _id: id };
+                }
+            },
+            async () => {
+                await withStubs(
+                    userService,
+                    {
+                        incrementUserBalances: async (
+                            id,
+                            changes,
+                            receivedTransaction
+                        ) => {
+                            assert.equal(receivedTransaction, transaction);
+                            balanceUpdates.push({ id, changes });
+                        }
+                    },
+                    async () => {
+                        await service.deleteDebt('debt-1', 'creditor');
+                    }
+                );
+            }
+        );
+
+        assert.equal(state.committed, true);
         assert.deepEqual(balanceUpdates, [
             { id: 'creditor', changes: { owes: -30 } },
             { id: 'debtor', changes: { owe: -30 } }
         ]);
     });
 
-    it('aborta la transacción cuando falla una operación financiera', async () => {
-        const session = createSession();
+    it('marca una deuda como pagada con el mismo contexto', async () => {
+        const { state, transaction, transactionManager } = (
+            createTestTransactionManager()
+        );
+        const service = createService(transactionManager);
+        const balanceUpdates = [];
 
         await withStubs(
-            mongoose,
-            { startSession: async () => session },
+            debtRepository,
+            {
+                findById: async (id, options) => {
+                    assert.deepEqual(options, { transaction });
+                    return {
+                        creditor: 'creditor',
+                        debtor: ['debtor'],
+                        value: 25,
+                        state: true
+                    };
+                },
+                updateById: async (id, data, options) => {
+                    assert.deepEqual(options, { transaction });
+                    return { _id: id, ...data };
+                }
+            },
             async () => {
                 await withStubs(
-                    groupRepository,
+                    userService,
                     {
-                        findActiveById: async () => ({
-                            state: true,
-                            members: ['creditor', 'debtor']
-                        })
+                        incrementUserBalances: async (
+                            id,
+                            changes,
+                            receivedTransaction
+                        ) => {
+                            assert.equal(receivedTransaction, transaction);
+                            balanceUpdates.push({ id, changes });
+                        }
                     },
                     async () => {
+                        const paidDebt = await service.markAsPaid(
+                            'debt-1',
+                            'debtor'
+                        );
+
+                        assert.equal(paidDebt.state, false);
+                    }
+                );
+            }
+        );
+
+        assert.equal(state.committed, true);
+        assert.deepEqual(balanceUpdates, [
+            { id: 'creditor', changes: { owes: -25 } },
+            { id: 'debtor', changes: { owe: -25 } }
+        ]);
+    });
+
+    it('aborta la transacción cuando falla una operación financiera', async () => {
+        const { state, transactionManager } = createTestTransactionManager();
+        const service = createService(transactionManager);
+
+        await withStubs(
+            groupRepository,
+            {
+                findActiveById: async () => ({
+                    state: true,
+                    members: ['creditor', 'debtor']
+                })
+            },
+            async () => {
+                await withStubs(
+                    debtRepository,
+                    { create: async data => data },
+                    async () => {
                         await withStubs(
-                            debtRepository,
-                            { create: async data => data },
+                            userService,
+                            {
+                                incrementUserBalances: async () => {
+                                    throw new Error('Fallo simulado');
+                                }
+                            },
                             async () => {
-                                await withStubs(
-                                    userService,
-                                    {
-                                        incrementUserBalances: async () => {
-                                            throw new Error('Fallo simulado');
-                                        }
-                                    },
-                                    async () => {
-                                        await assert.rejects(
-                                            () => debtService.createDebt(
-                                                {
-                                                    description: 'Cena',
-                                                    value: 50,
-                                                    group: 'group-1',
-                                                    debtor: ['debtor']
-                                                },
-                                                { userId: 'creditor' }
-                                            ),
-                                            /Fallo simulado/
-                                        );
-                                    }
+                                await assert.rejects(
+                                    () => service.createDebt(
+                                        {
+                                            description: 'Cena',
+                                            value: 50,
+                                            group: 'group-1',
+                                            debtor: ['debtor']
+                                        },
+                                        { userId: 'creditor' }
+                                    ),
+                                    /Fallo simulado/
                                 );
                             }
                         );
@@ -323,7 +370,7 @@ describe('debtService: historial y consistencia financiera', () => {
             }
         );
 
-        assert.equal(session.aborted, true);
-        assert.equal(session.ended, true);
+        assert.equal(state.aborted, true);
+        assert.equal(state.committed, false);
     });
 });
