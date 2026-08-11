@@ -1,16 +1,33 @@
-
 require('dotenv').config();
-const Server = require('./src/models/server');
+const { createAppConfig } = require('./src/config/appConfig');
 
-const server = new Server();
-
-const startServer = async () => {
+const startServer = async ({
+    env = process.env,
+    loadServer = () => require('./src/models/server'),
+    logger = console,
+    setExitCode = exitCode => {
+        process.exitCode = exitCode;
+    }
+} = {}) => {
     try {
+        const config = createAppConfig(env);
+        const Server = loadServer();
+        const server = new Server({ config });
+
         await server.start();
+        return server;
     } catch (error) {
-        console.error('No fue posible iniciar la aplicación:', error.message);
-        process.exitCode = 1;
+        logger.error(
+            'No fue posible iniciar la aplicación:',
+            error.message
+        );
+        setExitCode(1);
+        return null;
     }
 };
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
+
+module.exports = { startServer };

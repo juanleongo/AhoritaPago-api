@@ -1,18 +1,29 @@
 const express = require('express');
-const { connection } = require('../db/config');
+const { createConnection } = require('../db/config');
 const { errorHandler, notFoundHandler } = require('../middlewares');
 const { createCompositionRoot } = require('../compositionRoot');
+const { createAppConfig } = require('../config/appConfig');
 class Server {
      
     constructor(options = {}) {
+       this.config = (
+        options.config
+        || options.compositionRoot?.infrastructure?.config
+        || createAppConfig(options.env)
+       )
        this.app = express()
-       this.port = options.port || process.env.PORT
-       this.connection = options.connection || connection
+       this.port = options.port ?? this.config.server.port
+       this.connection = options.connection || createConnection({
+        databaseUrl: this.config.database.url
+       })
        this.compositionRoot = (
-        options.compositionRoot || createCompositionRoot()
+        options.compositionRoot || createCompositionRoot({
+            infrastructure: { config: this.config }
+        })
        )
        this.httpSecurityConfig = (
         this.compositionRoot.infrastructure.httpSecurityConfig
+        || this.config.httpSecurity
        )
        this.paths = {
         auth:       '/api/auth',

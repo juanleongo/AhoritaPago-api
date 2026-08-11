@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const userRepository = require('../repositories/user');
 const { createHttpError } = require('../helpers/httpError');
+const {
+    getJwtSecretFromEnvironment
+} = require('../config/appConfig');
 
 const createAuthVerify = ({
     tokenProvider,
@@ -76,7 +79,7 @@ const createAuthVerify = ({
 };
 
 const authVerify = createAuthVerify({
-    getJwtSecret: () => process.env.JWT_SECRET,
+    getJwtSecret: getJwtSecretFromEnvironment,
     tokenProvider: jwt,
     userRepository
 });

@@ -1,19 +1,21 @@
-const moongoose = require('mongoose')
+const mongoose = require('mongoose');
+const { createAppConfig } = require('../config/appConfig');
 
-const connection= async () =>  {
-    
-    try {
-        await moongoose.connect(process.env.DATABASE_URL, {      
-        })
-        console.log('DB Connected')
-        
-    } catch (error) {
-        console.log(error)
-        throw error
-        
-    }
-}
+const createConnection = ({
+    databaseUrl,
+    logger = console,
+    mongooseProvider = mongoose
+}) => async () => {
+    await mongooseProvider.connect(databaseUrl, {});
+    logger.log('DB Connected');
+};
+
+const connection = async () => {
+    const config = createAppConfig();
+    return createConnection({ databaseUrl: config.database.url })();
+};
 
 module.exports = {
-    connection
-}
+    connection,
+    createConnection
+};

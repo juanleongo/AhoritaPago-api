@@ -64,6 +64,9 @@ Completa los valores de `.env` y ejecuta la API:
 npm run dev
 ```
 
+El valor de ejemplo de `JWT_SECRET` es rechazado intencionalmente y debe
+reemplazarse antes de iniciar.
+
 La API utiliza el puerto indicado en `PORT`.
 El puerto solo se abre después de establecer correctamente la conexión con
 MongoDB. Si la conexión falla, la aplicación informa el error y no acepta
@@ -87,9 +90,9 @@ continua y producción resuelvan el mismo árbol de dependencias.
 
 | Variable | Descripción |
 |---|---|
-| `PORT` | Puerto HTTP de la aplicación. |
-| `DATABASE_URL` | URI de conexión a MongoDB. |
-| `JWT_SECRET` | Secreto privado utilizado para firmar y validar JWT. |
+| `PORT` | Obligatoria. Entero entre `1` y `65535`. |
+| `DATABASE_URL` | Obligatoria. URI que empieza por `mongodb://` o `mongodb+srv://`. |
+| `JWT_SECRET` | Obligatoria. Mínimo 32 caracteres, sin espacios externos y distinta del valor de ejemplo. |
 | `CORS_ALLOW_LOCALHOST` | Permite orígenes HTTP/HTTPS en `localhost`, `127.0.0.1` y `::1`, sin restringir el puerto. Por defecto: `true`. |
 | `CORS_ALLOWED_ORIGINS` | Lista de orígenes autorizados separados por coma, sin rutas. |
 | `JSON_BODY_LIMIT` | Tamaño máximo de un cuerpo JSON. Por defecto: `100kb`. |
@@ -104,6 +107,43 @@ continua y producción resuelvan el mismo árbol de dependencias.
 
 No se debe versionar el archivo `.env` ni usar el valor de ejemplo de
 `JWT_SECRET` en un entorno real.
+
+Los booleanos opcionales solo aceptan `true` o `false`. Los límites y ventanas
+deben ser enteros positivos, salvo `TRUST_PROXY_HOPS`, que también admite
+`0`. `JSON_BODY_LIMIT` acepta tamaños positivos en `b`, `kb` o `mb`.
+`CORS_ALLOWED_ORIGINS` acepta orígenes HTTP/HTTPS separados por coma, sin
+rutas, credenciales, query ni fragmentos.
+
+### Validación al iniciar
+
+La configuración se carga y valida antes de importar y construir el servidor:
+
+```text
+.env
+  |
+  v
+Configuración validada
+  |
+  +--> Puerto
+  +--> Conexión MongoDB
+  +--> JWT
+  `--> Seguridad HTTP
+  |
+  v
+Composition root y Server
+  |
+  v
+MongoDB -> puerto HTTP
+```
+
+Si una o más variables son inválidas, la API informa todas sus reglas
+incumplidas, asigna un código de salida de error y no construye Express, no
+intenta conectarse a MongoDB y no abre el puerto. Los valores recibidos y el
+contenido de `JWT_SECRET` nunca se incluyen en el error.
+
+Antes de desplegar una actualización en Render, comprueba especialmente que
+el secreto configurado tenga al menos 32 caracteres. Un valor inválido hará
+que el servicio falle inmediatamente, en lugar de iniciar parcialmente.
 
 ## Scripts
 
@@ -229,6 +269,7 @@ Repositorios + infraestructura
 
 El composition root construye e inyecta:
 
+- configuración validada de servidor, base de datos, JWT y seguridad HTTP;
 - repositorios de usuarios, grupos y deudas;
 - bcrypt como proveedor de contraseñas;
 - JWT y la función que obtiene el secreto;
@@ -776,6 +817,8 @@ Cobertura inicial:
 - Encabezados de Helmet, CORS local y límite de cuerpos JSON.
 - Rate limiting deshabilitado por defecto y contratos `429` de los tres
   limitadores cuando se activan.
+- Validación central, normalización e inyección de variables de entorno.
+- Fallo de arranque previo a Express y MongoDB ante configuración inválida.
 
 Ejecutar:
 

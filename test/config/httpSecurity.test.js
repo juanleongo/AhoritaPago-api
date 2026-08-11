@@ -1,8 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-    createHttpSecurityConfig,
-    DEFAULTS
+    createHttpSecurityConfig
 } = require('../../src/config/httpSecurity');
 
 describe('configuración de seguridad HTTP', () => {
@@ -38,26 +37,50 @@ describe('configuración de seguridad HTTP', () => {
         assert.equal(config.trustProxyHops, 2);
     });
 
-    it('usa valores seguros si los límites numéricos son inválidos', () => {
-        const config = createHttpSecurityConfig({
-            GLOBAL_RATE_LIMIT_MAX: '0',
-            LOGIN_RATE_LIMIT_WINDOW_MS: '-1',
-            REGISTRATION_RATE_LIMIT_MAX: 'no-es-un-número',
-            TRUST_PROXY_HOPS: '-3'
-        });
+    it('rechaza límites numéricos inválidos en lugar de ocultarlos', () => {
+        assert.throws(
+            () => createHttpSecurityConfig({
+                GLOBAL_RATE_LIMIT_MAX: '0',
+                LOGIN_RATE_LIMIT_WINDOW_MS: '-1',
+                REGISTRATION_RATE_LIMIT_MAX: 'no-es-un-número',
+                TRUST_PROXY_HOPS: '-3'
+            }),
+            error => {
+                assert.equal(error.code, 'INVALID_CONFIGURATION');
+                assert.deepEqual(
+                    error.details.map(detail => detail.variable),
+                    [
+                        'GLOBAL_RATE_LIMIT_MAX',
+                        'LOGIN_RATE_LIMIT_WINDOW_MS',
+                        'REGISTRATION_RATE_LIMIT_MAX',
+                        'TRUST_PROXY_HOPS'
+                    ]
+                );
+                return true;
+            }
+        );
+    });
 
-        assert.equal(
-            config.globalRateLimitMax,
-            DEFAULTS.globalRateLimitMax
+    it('rechaza booleanos, orígenes y tamaños inválidos', () => {
+        assert.throws(
+            () => createHttpSecurityConfig({
+                CORS_ALLOW_LOCALHOST: 'sí',
+                CORS_ALLOWED_ORIGINS: 'https://app.example.com/path',
+                JSON_BODY_LIMIT: 'sin-límite',
+                RATE_LIMIT_ENABLED: 'enabled'
+            }),
+            error => {
+                assert.deepEqual(
+                    error.details.map(detail => detail.variable),
+                    [
+                        'CORS_ALLOW_LOCALHOST',
+                        'CORS_ALLOWED_ORIGINS',
+                        'JSON_BODY_LIMIT',
+                        'RATE_LIMIT_ENABLED'
+                    ]
+                );
+                return true;
+            }
         );
-        assert.equal(
-            config.loginRateLimitWindowMs,
-            DEFAULTS.loginRateLimitWindowMs
-        );
-        assert.equal(
-            config.registrationRateLimitMax,
-            DEFAULTS.registrationRateLimitMax
-        );
-        assert.equal(config.trustProxyHops, DEFAULTS.trustProxyHops);
     });
 });

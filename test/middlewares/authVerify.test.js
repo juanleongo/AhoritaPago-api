@@ -2,10 +2,11 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const userRepository = require('../../src/repositories/user');
-const { authVerify } = require('../../src/middlewares/authVerify');
+const { createAuthVerify } = require('../../src/middlewares/authVerify');
 const { errorHandler } = require('../../src/middlewares/errorHandler');
 
 const JWT_SECRET = 'test-secret';
+let authVerify;
 
 const executeMiddleware = async (authorization) => {
     const result = {
@@ -46,28 +47,24 @@ const executeMiddleware = async (authorization) => {
 };
 
 describe('authVerify', () => {
-    let previousSecret;
     let previousFindActiveById;
 
     beforeEach(() => {
-        previousSecret = process.env.JWT_SECRET;
-        process.env.JWT_SECRET = JWT_SECRET;
         previousFindActiveById = userRepository.findActiveById;
         userRepository.findActiveById = async id => ({
             _id: id,
             nickname: 'usuario',
             state: true
         });
+        authVerify = createAuthVerify({
+            getJwtSecret: () => JWT_SECRET,
+            tokenProvider: jwt,
+            userRepository
+        });
     });
 
     afterEach(() => {
         userRepository.findActiveById = previousFindActiveById;
-
-        if (previousSecret === undefined) {
-            delete process.env.JWT_SECRET;
-        } else {
-            process.env.JWT_SECRET = previousSecret;
-        }
     });
 
     it('rechaza una solicitud sin encabezado Authorization', async () => {

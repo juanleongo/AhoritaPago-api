@@ -1,9 +1,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Server = require('../../src/models/server');
+const {
+    createTestAppConfig
+} = require('../fixtures/appConfig');
 
 const withHttpServer = async work => {
-    const instance = new Server();
+    const instance = new Server({ config: createTestAppConfig() });
     const listener = instance.app.listen(0);
     await new Promise(resolve => listener.once('listening', resolve));
     const baseUrl = `http://127.0.0.1:${listener.address().port}`;

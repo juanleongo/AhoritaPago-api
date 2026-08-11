@@ -2,6 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Server = require('../../src/models/server');
 const { createCompositionRoot } = require('../../src/compositionRoot');
+const {
+    createTestAppConfig
+} = require('../fixtures/appConfig');
 
 const withHttpServer = async (server, work) => {
     const listener = server.app.listen(0);
@@ -29,7 +32,11 @@ test('espera la conexión a MongoDB antes de abrir el puerto', async () => {
         events.push('connection:end');
     };
 
-    const server = new Server({ connection, port: 3001 });
+    const server = new Server({
+        config: createTestAppConfig(),
+        connection,
+        port: 3001
+    });
 
     server.app.listen = (port, callback) => {
         events.push(`listen:${port}`);
@@ -52,9 +59,21 @@ test('espera la conexión a MongoDB antes de abrir el puerto', async () => {
     ]);
 });
 
+test('utiliza el puerto numérico de la configuración validada', () => {
+    const config = createTestAppConfig({ PORT: '4321' });
+    const server = new Server({
+        config,
+        connection: async () => {}
+    });
+
+    assert.equal(server.port, 4321);
+    assert.equal(server.config, config);
+});
+
 test('no abre el puerto cuando falla la conexión a MongoDB', async () => {
     const connectionError = new Error('MongoDB no disponible');
     const server = new Server({
+        config: createTestAppConfig(),
         connection: async () => {
             throw connectionError;
         },
@@ -72,6 +91,7 @@ test('no abre el puerto cuando falla la conexión a MongoDB', async () => {
 
 test('registra los manejadores de errores después de todas las rutas', () => {
     const server = new Server({
+        config: createTestAppConfig(),
         connection: async () => {},
         port: 3001
     });
@@ -90,7 +110,7 @@ test('registra los manejadores de errores después de todas las rutas', () => {
 });
 
 test('activa encabezados defensivos y CORS para el frontend local', async () => {
-    const server = new Server();
+    const server = new Server({ config: createTestAppConfig() });
 
     await withHttpServer(server, async baseUrl => {
         const response = await fetch(`${baseUrl}/ruta-inexistente`, {
@@ -110,6 +130,7 @@ test('activa encabezados defensivos y CORS para el frontend local', async () => 
 test('no configura trust proxy mientras el rate limiting está apagado', () => {
     const compositionRoot = createCompositionRoot({
         infrastructure: {
+            config: createTestAppConfig(),
             httpSecurityConfig: {
                 corsAllowLocalhost: true,
                 corsAllowedOrigins: [],
@@ -128,6 +149,7 @@ test('no configura trust proxy mientras el rate limiting está apagado', () => {
 test('rechaza cuerpos JSON que superan el límite configurado', async () => {
     const compositionRoot = createCompositionRoot({
         infrastructure: {
+            config: createTestAppConfig(),
             httpSecurityConfig: {
                 corsAllowLocalhost: true,
                 corsAllowedOrigins: [],
@@ -150,4 +172,18 @@ test('rechaza cuerpos JSON que superan el límite configurado', async () => {
         assert.equal(response.status, 413);
         assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
     });
+});
+
+test('rechaza la configuración inválida antes de construir Express', () => {
+    assert.throws(
+        () => new Server({ env: {} }),
+        error => {
+            assert.equal(error.code, 'INVALID_CONFIGURATION');
+            assert.deepEqual(
+                error.details.map(detail => detail.variable),
+                ['PORT', 'DATABASE_URL', 'JWT_SECRET']
+            );
+            return true;
+        }
+    );
 });

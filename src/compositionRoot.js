@@ -18,10 +18,14 @@ const { createUserRouter } = require('./routes/user');
 const { createGroupRouter } = require('./routes/group');
 const { createAuthRouter } = require('./routes/auth');
 const { createDebtRouter } = require('./routes/debt');
-const { createHttpSecurityConfig } = require('./config/httpSecurity');
 const { createHttpSecurity } = require('./middlewares/httpSecurity');
+const { createAppConfig } = require('./config/appConfig');
 
 const createCompositionRoot = (overrides = {}) => {
+    const config = (
+        overrides.infrastructure?.config
+        || createAppConfig(overrides.env)
+    );
     const repositories = {
         user: overrides.repositories?.user || userRepository,
         group: overrides.repositories?.group || groupRepository,
@@ -29,6 +33,7 @@ const createCompositionRoot = (overrides = {}) => {
     };
 
     const infrastructure = {
+        config,
         passwordHasher: (
             overrides.infrastructure?.passwordHasher || bcrypt
         ),
@@ -40,11 +45,11 @@ const createCompositionRoot = (overrides = {}) => {
         ),
         getJwtSecret: (
             overrides.infrastructure?.getJwtSecret
-            || (() => process.env.JWT_SECRET)
+            || (() => config.auth.jwtSecret)
         ),
         httpSecurityConfig: (
             overrides.infrastructure?.httpSecurityConfig
-            || createHttpSecurityConfig()
+            || config.httpSecurity
         )
     };
 

@@ -1,6 +1,9 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { createCompositionRoot } = require('../../src/compositionRoot');
+const {
+    createTestAppConfig
+} = require('../fixtures/appConfig');
 
 const createInjectedDependencies = () => {
     const calls = [];
@@ -49,6 +52,7 @@ const createInjectedDependencies = () => {
             debt: {}
         },
         infrastructure: {
+            config: createTestAppConfig(),
             generateRandomCode: () => 'ABC123',
             getJwtSecret: () => 'injected-secret',
             mongoose: {},
@@ -61,6 +65,23 @@ const createInjectedDependencies = () => {
 };
 
 describe('composition root e inyección de dependencias', () => {
+    it('propaga la configuración validada como infraestructura', () => {
+        const config = createTestAppConfig();
+        const root = createCompositionRoot({
+            infrastructure: { config }
+        });
+
+        assert.equal(root.infrastructure.config, config);
+        assert.equal(
+            root.infrastructure.getJwtSecret(),
+            config.auth.jwtSecret
+        );
+        assert.equal(
+            root.infrastructure.httpSecurityConfig,
+            config.httpSecurity
+        );
+    });
+
     it('construye servicios con repositorios y proveedores inyectados', async () => {
         const { calls, root } = createInjectedDependencies();
 
@@ -117,6 +138,7 @@ describe('composition root e inyección de dependencias', () => {
             }
         };
         const root = createCompositionRoot({
+            infrastructure: { config: createTestAppConfig() },
             services: { user: injectedUserService }
         });
         const result = {};

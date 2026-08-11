@@ -1,3 +1,5 @@
+const { ConfigurationError } = require('./configurationError');
+
 const DEFAULTS = Object.freeze({
     corsAllowLocalhost: true,
     corsAllowedOrigins: [],
@@ -12,86 +14,209 @@ const DEFAULTS = Object.freeze({
     trustProxyHops: 0
 });
 
-const parseBoolean = (value, fallback) => {
-    if (value === undefined || value === '') {
+const isMissing = value => value === undefined || value === '';
+
+const parseBoolean = (variable, value, fallback, errors) => {
+    if (isMissing(value)) {
         return fallback;
     }
 
-    return String(value).trim().toLowerCase() === 'true';
+    const normalizedValue = String(value).trim().toLowerCase();
+
+    if (!['true', 'false'].includes(normalizedValue)) {
+        errors.push({
+            variable,
+            message: 'debe ser true o false.'
+        });
+        return fallback;
+    }
+
+    return normalizedValue === 'true';
 };
 
-const parseNonNegativeInteger = (value, fallback) => {
-    if (value === undefined || value === '') {
+const parseInteger = ({
+    variable,
+    value,
+    fallback,
+    minimum,
+    errors
+}) => {
+    if (isMissing(value)) {
         return fallback;
     }
 
-    const parsedValue = Number(value);
+    const normalizedValue = String(value).trim();
 
-    if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+    if (!/^\d+$/.test(normalizedValue)) {
+        errors.push({
+            variable,
+            message: `debe ser un entero mayor o igual que ${minimum}.`
+        });
+        return fallback;
+    }
+
+    const parsedValue = Number(normalizedValue);
+
+    if (!Number.isSafeInteger(parsedValue) || parsedValue < minimum) {
+        errors.push({
+            variable,
+            message: `debe ser un entero mayor o igual que ${minimum}.`
+        });
         return fallback;
     }
 
     return parsedValue;
 };
 
-const parsePositiveInteger = (value, fallback) => {
-    const parsedValue = parseNonNegativeInteger(value, fallback);
-    return parsedValue > 0 ? parsedValue : fallback;
+const normalizeOrigin = (origin, errors) => {
+    if (origin === '*') {
+        return origin;
+    }
+
+    try {
+        const parsedOrigin = new URL(origin);
+        const hasOnlyOrigin = (
+            parsedOrigin.pathname === '/'
+            && !parsedOrigin.search
+            && !parsedOrigin.hash
+            && !parsedOrigin.username
+            && !parsedOrigin.password
+        );
+
+        if (
+            !['http:', 'https:'].includes(parsedOrigin.protocol)
+            || !hasOnlyOrigin
+        ) {
+            throw new Error('Invalid origin');
+        }
+
+        return parsedOrigin.origin;
+    } catch (error) {
+        errors.push({
+            variable: 'CORS_ALLOWED_ORIGINS',
+            message: 'debe contener únicamente orígenes HTTP/HTTPS válidos.'
+        });
+        return null;
+    }
 };
 
-const parseOrigins = value => {
-    if (!value) {
+const parseOrigins = (value, errors) => {
+    if (isMissing(value)) {
         return [];
     }
 
-    return [...new Set(
-        String(value)
-            .split(',')
-            .map(origin => origin.trim().replace(/\/$/, ''))
-            .filter(Boolean)
-    )];
+    const origins = String(value)
+        .split(',')
+        .map(origin => origin.trim())
+        .filter(Boolean)
+        .map(origin => normalizeOrigin(origin, errors))
+        .filter(Boolean);
+
+    if (origins.includes('*') && origins.length > 1) {
+        errors.push({
+            variable: 'CORS_ALLOWED_ORIGINS',
+            message: 'no puede combinar * con orígenes específicos.'
+        });
+    }
+
+    return [...new Set(origins)];
 };
 
-const createHttpSecurityConfig = (env = process.env) => ({
-    corsAllowLocalhost: parseBoolean(
-        env.CORS_ALLOW_LOCALHOST,
-        DEFAULTS.corsAllowLocalhost
-    ),
-    corsAllowedOrigins: parseOrigins(env.CORS_ALLOWED_ORIGINS),
-    globalRateLimitMax: parsePositiveInteger(
-        env.GLOBAL_RATE_LIMIT_MAX,
-        DEFAULTS.globalRateLimitMax
-    ),
-    globalRateLimitWindowMs: parsePositiveInteger(
-        env.GLOBAL_RATE_LIMIT_WINDOW_MS,
-        DEFAULTS.globalRateLimitWindowMs
-    ),
-    jsonBodyLimit: env.JSON_BODY_LIMIT || DEFAULTS.jsonBodyLimit,
-    loginRateLimitMax: parsePositiveInteger(
-        env.LOGIN_RATE_LIMIT_MAX,
-        DEFAULTS.loginRateLimitMax
-    ),
-    loginRateLimitWindowMs: parsePositiveInteger(
-        env.LOGIN_RATE_LIMIT_WINDOW_MS,
-        DEFAULTS.loginRateLimitWindowMs
-    ),
-    rateLimitEnabled: parseBoolean(
-        env.RATE_LIMIT_ENABLED,
-        DEFAULTS.rateLimitEnabled
-    ),
-    registrationRateLimitMax: parsePositiveInteger(
-        env.REGISTRATION_RATE_LIMIT_MAX,
-        DEFAULTS.registrationRateLimitMax
-    ),
-    registrationRateLimitWindowMs: parsePositiveInteger(
-        env.REGISTRATION_RATE_LIMIT_WINDOW_MS,
-        DEFAULTS.registrationRateLimitWindowMs
-    ),
-    trustProxyHops: parseNonNegativeInteger(
-        env.TRUST_PROXY_HOPS,
-        DEFAULTS.trustProxyHops
-    )
-});
+const parseBodyLimit = (value, errors) => {
+    if (isMissing(value)) {
+        return DEFAULTS.jsonBodyLimit;
+    }
+
+    const normalizedValue = String(value).trim().toLowerCase();
+
+    if (!/^[1-9]\d*(b|kb|mb)$/.test(normalizedValue)) {
+        errors.push({
+            variable: 'JSON_BODY_LIMIT',
+            message: 'debe ser un tamaño positivo expresado en b, kb o mb.'
+        });
+        return DEFAULTS.jsonBodyLimit;
+    }
+
+    return normalizedValue;
+};
+
+const createHttpSecurityConfig = (env = {}) => {
+    const errors = [];
+    const config = {
+        corsAllowLocalhost: parseBoolean(
+            'CORS_ALLOW_LOCALHOST',
+            env.CORS_ALLOW_LOCALHOST,
+            DEFAULTS.corsAllowLocalhost,
+            errors
+        ),
+        corsAllowedOrigins: parseOrigins(
+            env.CORS_ALLOWED_ORIGINS,
+            errors
+        ),
+        globalRateLimitMax: parseInteger({
+            variable: 'GLOBAL_RATE_LIMIT_MAX',
+            value: env.GLOBAL_RATE_LIMIT_MAX,
+            fallback: DEFAULTS.globalRateLimitMax,
+            minimum: 1,
+            errors
+        }),
+        globalRateLimitWindowMs: parseInteger({
+            variable: 'GLOBAL_RATE_LIMIT_WINDOW_MS',
+            value: env.GLOBAL_RATE_LIMIT_WINDOW_MS,
+            fallback: DEFAULTS.globalRateLimitWindowMs,
+            minimum: 1,
+            errors
+        }),
+        jsonBodyLimit: parseBodyLimit(env.JSON_BODY_LIMIT, errors),
+        loginRateLimitMax: parseInteger({
+            variable: 'LOGIN_RATE_LIMIT_MAX',
+            value: env.LOGIN_RATE_LIMIT_MAX,
+            fallback: DEFAULTS.loginRateLimitMax,
+            minimum: 1,
+            errors
+        }),
+        loginRateLimitWindowMs: parseInteger({
+            variable: 'LOGIN_RATE_LIMIT_WINDOW_MS',
+            value: env.LOGIN_RATE_LIMIT_WINDOW_MS,
+            fallback: DEFAULTS.loginRateLimitWindowMs,
+            minimum: 1,
+            errors
+        }),
+        rateLimitEnabled: parseBoolean(
+            'RATE_LIMIT_ENABLED',
+            env.RATE_LIMIT_ENABLED,
+            DEFAULTS.rateLimitEnabled,
+            errors
+        ),
+        registrationRateLimitMax: parseInteger({
+            variable: 'REGISTRATION_RATE_LIMIT_MAX',
+            value: env.REGISTRATION_RATE_LIMIT_MAX,
+            fallback: DEFAULTS.registrationRateLimitMax,
+            minimum: 1,
+            errors
+        }),
+        registrationRateLimitWindowMs: parseInteger({
+            variable: 'REGISTRATION_RATE_LIMIT_WINDOW_MS',
+            value: env.REGISTRATION_RATE_LIMIT_WINDOW_MS,
+            fallback: DEFAULTS.registrationRateLimitWindowMs,
+            minimum: 1,
+            errors
+        }),
+        trustProxyHops: parseInteger({
+            variable: 'TRUST_PROXY_HOPS',
+            value: env.TRUST_PROXY_HOPS,
+            fallback: DEFAULTS.trustProxyHops,
+            minimum: 0,
+            errors
+        })
+    };
+
+    if (errors.length > 0) {
+        throw new ConfigurationError(errors);
+    }
+
+    return config;
+};
 
 module.exports = {
     createHttpSecurityConfig,
