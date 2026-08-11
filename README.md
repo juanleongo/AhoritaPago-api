@@ -26,6 +26,8 @@ saldos, marcar pagos y revisar el historial de obligaciones activas y pagadas.
 - JSON Web Tokens.
 - bcryptjs.
 - express-validator.
+- Helmet y CORS configurable para seguridad HTTP.
+- express-rate-limit, preparado para habilitarse por entorno.
 - Node Test Runner para pruebas automatizadas.
 
 ## Requisitos
@@ -71,6 +73,17 @@ solicitudes HTTP.
 | `PORT` | Puerto HTTP de la aplicación. |
 | `DATABASE_URL` | URI de conexión a MongoDB. |
 | `JWT_SECRET` | Secreto privado utilizado para firmar y validar JWT. |
+| `CORS_ALLOW_LOCALHOST` | Permite orígenes HTTP/HTTPS en `localhost`, `127.0.0.1` y `::1`, sin restringir el puerto. Por defecto: `true`. |
+| `CORS_ALLOWED_ORIGINS` | Lista de orígenes autorizados separados por coma, sin rutas. |
+| `JSON_BODY_LIMIT` | Tamaño máximo de un cuerpo JSON. Por defecto: `100kb`. |
+| `RATE_LIMIT_ENABLED` | Activa los límites global, de login y de registro. Por defecto: `false`. |
+| `TRUST_PROXY_HOPS` | Cantidad de proxies confiables delante de Express. Solo se aplica si el rate limiting está activo. Por defecto: `0`. |
+| `GLOBAL_RATE_LIMIT_WINDOW_MS` | Ventana del límite general en milisegundos. Por defecto: `900000`. |
+| `GLOBAL_RATE_LIMIT_MAX` | Solicitudes generales permitidas por ventana. Por defecto: `500`. |
+| `LOGIN_RATE_LIMIT_WINDOW_MS` | Ventana del límite de login. Por defecto: `900000`. |
+| `LOGIN_RATE_LIMIT_MAX` | Intentos fallidos de login permitidos por ventana. Por defecto: `15`. |
+| `REGISTRATION_RATE_LIMIT_WINDOW_MS` | Ventana del límite de registro. Por defecto: `3600000`. |
+| `REGISTRATION_RATE_LIMIT_MAX` | Registros permitidos por ventana. Por defecto: `10`. |
 
 No se debe versionar el archivo `.env` ni usar el valor de ejemplo de
 `JWT_SECRET` en un entorno real.
@@ -280,6 +293,47 @@ Solo estas operaciones son públicas:
 - `POST /api/user`
 
 Las demás rutas de usuarios, grupos y deudas requieren un JWT válido.
+
+## Seguridad HTTP
+
+La API aplica Helmet antes de las rutas para agregar encabezados defensivos y
+ocultar `X-Powered-By`. También limita explícitamente el cuerpo JSON; si se
+supera `JSON_BODY_LIMIT`, responde `413` con el código
+`PAYLOAD_TOO_LARGE`.
+
+CORS ya no autoriza indiscriminadamente todos los orígenes. Durante el
+desarrollo, `CORS_ALLOW_LOCALHOST=true` permite consumir la API desplegada en
+Render desde un frontend local en cualquier puerto. Los clientes que no son
+navegadores y no envían el encabezado `Origin` continúan permitidos. Para un
+frontend desplegado, su origen completo debe agregarse a
+`CORS_ALLOWED_ORIGINS`; por ejemplo:
+
+```env
+CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
+```
+
+### Estado temporal de los límites por IP
+
+En la fase actual se conserva:
+
+```env
+RATE_LIMIT_ENABLED=false
+TRUST_PROXY_HOPS=0
+```
+
+Con esta configuración no se monta ningún rate limiter, no se contabilizan ni
+bloquean direcciones IP, no se generan respuestas `429` y Express mantiene
+`trust proxy=false`. Los valores globales, de login y de registro quedan
+preparados, pero no tienen efecto hasta activar explícitamente la función.
+
+Cuando se vaya a habilitar en Render, primero se debe comprobar la cadena real
+de proxies y definir `TRUST_PROXY_HOPS` con ese valor. Una configuración
+incorrecta puede hacer que varias personas compartan un mismo contador o que
+un cliente manipule la IP utilizada. Después se puede establecer
+`RATE_LIMIT_ENABLED=true` y probar login, registro y tráfico general desde el
+frontend real. El almacenamiento incluido es local al proceso; si se ejecutan
+varias instancias de la API, se debe configurar posteriormente un almacén
+compartido para que el conteo sea consistente entre ellas.
 
 ## Validación y DTO de entrada
 
@@ -624,6 +678,9 @@ Cobertura inicial:
 - Commit y abort de transacciones.
 - Reversión de saldos al eliminar deudas.
 - Bloqueo transaccional de la desactivación cuando existen deudas activas.
+- Encabezados de Helmet, CORS local y límite de cuerpos JSON.
+- Rate limiting deshabilitado por defecto y contratos `429` de los tres
+  limitadores cuando se activan.
 
 Ejecutar:
 

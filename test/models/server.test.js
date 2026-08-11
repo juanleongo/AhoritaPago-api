@@ -1,6 +1,21 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const Server = require('../../src/models/server');
+const { createCompositionRoot } = require('../../src/compositionRoot');
+
+const withHttpServer = async (server, work) => {
+    const listener = server.app.listen(0);
+    await new Promise(resolve => listener.once('listening', resolve));
+    const baseUrl = `http://127.0.0.1:${listener.address().port}`;
+
+    try {
+        await work(baseUrl);
+    } finally {
+        await new Promise((resolve, reject) => {
+            listener.close(error => error ? reject(error) : resolve());
+        });
+    }
+};
 
 test('espera la conexión a MongoDB antes de abrir el puerto', async () => {
     const events = [];
@@ -72,4 +87,67 @@ test('registra los manejadores de errores después de todas las rutas', () => {
 
     assert.ok(lastRouterIndex >= 0);
     assert.ok(lastRouterIndex < notFoundIndex);
+});
+
+test('activa encabezados defensivos y CORS para el frontend local', async () => {
+    const server = new Server();
+
+    await withHttpServer(server, async baseUrl => {
+        const response = await fetch(`${baseUrl}/ruta-inexistente`, {
+            headers: { Origin: 'http://localhost:5173' }
+        });
+
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+        assert.equal(response.headers.get('x-powered-by'), null);
+        assert.equal(
+            response.headers.get('access-control-allow-origin'),
+            'http://localhost:5173'
+        );
+    });
+});
+
+test('no configura trust proxy mientras el rate limiting está apagado', () => {
+    const compositionRoot = createCompositionRoot({
+        infrastructure: {
+            httpSecurityConfig: {
+                corsAllowLocalhost: true,
+                corsAllowedOrigins: [],
+                jsonBodyLimit: '100kb',
+                rateLimitEnabled: false,
+                trustProxyHops: 3
+            }
+        }
+    });
+    const server = new Server({ compositionRoot });
+
+    assert.equal(server.app.get('trust proxy'), false);
+    assert.equal(compositionRoot.middleware.globalRateLimiter, null);
+});
+
+test('rechaza cuerpos JSON que superan el límite configurado', async () => {
+    const compositionRoot = createCompositionRoot({
+        infrastructure: {
+            httpSecurityConfig: {
+                corsAllowLocalhost: true,
+                corsAllowedOrigins: [],
+                jsonBodyLimit: '1kb',
+                rateLimitEnabled: false,
+                trustProxyHops: 0
+            }
+        }
+    });
+    const server = new Server({ compositionRoot });
+
+    await withHttpServer(server, async baseUrl => {
+        const response = await fetch(`${baseUrl}/api/user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: 'x'.repeat(2048) })
+        });
+        const body = await response.json();
+
+        assert.equal(response.status, 413);
+        assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
+    });
 });

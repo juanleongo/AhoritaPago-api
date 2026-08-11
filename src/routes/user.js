@@ -5,6 +5,7 @@ const {
     validateForms
 } = require('../middlewares');
 const defaultUserController = require('../controllers/user');
+const { defaultHttpSecurity } = require('../middlewares/httpSecurity');
 const {
     createUserValidators,
     nicknameLookupValidators,
@@ -13,14 +14,20 @@ const {
     userIdValidators
 } = require('../validators/userValidators');
 
-const createUserRouter = ({ authVerify, userController }) => {
+const createUserRouter = ({
+    authVerify,
+    registrationRateLimiter,
+    userController
+}) => {
     const router = Router();
-
-    router.post('/', [
+    const registrationMiddleware = [
+        registrationRateLimiter,
         allowOnlyFields(['name', 'nickname', 'email', 'password']),
         ...createUserValidators,
         validateForms
-    ], userController.createUser);
+    ].filter(Boolean);
+
+    router.post('/', registrationMiddleware, userController.createUser);
 
     router.use(authVerify);
 
@@ -54,6 +61,7 @@ const createUserRouter = ({ authVerify, userController }) => {
 
 const router = createUserRouter({
     authVerify: defaultAuthVerify,
+    registrationRateLimiter: defaultHttpSecurity.registrationRateLimiter,
     userController: defaultUserController
 });
 

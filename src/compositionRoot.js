@@ -18,6 +18,8 @@ const { createUserRouter } = require('./routes/user');
 const { createGroupRouter } = require('./routes/group');
 const { createAuthRouter } = require('./routes/auth');
 const { createDebtRouter } = require('./routes/debt');
+const { createHttpSecurityConfig } = require('./config/httpSecurity');
+const { createHttpSecurity } = require('./middlewares/httpSecurity');
 
 const createCompositionRoot = (overrides = {}) => {
     const repositories = {
@@ -39,6 +41,10 @@ const createCompositionRoot = (overrides = {}) => {
         getJwtSecret: (
             overrides.infrastructure?.getJwtSecret
             || (() => process.env.JWT_SECRET)
+        ),
+        httpSecurityConfig: (
+            overrides.infrastructure?.httpSecurityConfig
+            || createHttpSecurityConfig()
         )
     };
 
@@ -67,6 +73,9 @@ const createCompositionRoot = (overrides = {}) => {
         userService: services.user
     });
 
+    const httpSecurity = createHttpSecurity(
+        infrastructure.httpSecurityConfig
+    );
     const middleware = {
         authVerify: (
             overrides.middleware?.authVerify
@@ -75,6 +84,20 @@ const createCompositionRoot = (overrides = {}) => {
                 tokenProvider: infrastructure.tokenProvider,
                 userRepository: repositories.user
             })
+        ),
+        cors: overrides.middleware?.cors ?? httpSecurity.cors,
+        globalRateLimiter: (
+            overrides.middleware?.globalRateLimiter
+            ?? httpSecurity.globalRateLimiter
+        ),
+        helmet: overrides.middleware?.helmet ?? httpSecurity.helmet,
+        loginRateLimiter: (
+            overrides.middleware?.loginRateLimiter
+            ?? httpSecurity.loginRateLimiter
+        ),
+        registrationRateLimiter: (
+            overrides.middleware?.registrationRateLimiter
+            ?? httpSecurity.registrationRateLimiter
         )
     };
 
@@ -96,6 +119,7 @@ const createCompositionRoot = (overrides = {}) => {
     const routers = {
         user: overrides.routers?.user || createUserRouter({
             authVerify: middleware.authVerify,
+            registrationRateLimiter: middleware.registrationRateLimiter,
             userController: controllers.user
         }),
         group: overrides.routers?.group || createGroupRouter({
@@ -103,7 +127,8 @@ const createCompositionRoot = (overrides = {}) => {
             groupController: controllers.group
         }),
         auth: overrides.routers?.auth || createAuthRouter({
-            authController: controllers.auth
+            authController: controllers.auth,
+            loginRateLimiter: middleware.loginRateLimiter
         }),
         debt: overrides.routers?.debt || createDebtRouter({
             authVerify: middleware.authVerify,
