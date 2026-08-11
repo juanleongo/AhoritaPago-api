@@ -23,10 +23,6 @@ const findActiveById = async (id, options = {}) => (
     applySession(Group.findOne({ _id: id, state: true }), options)
 );
 
-const findByName = async (name, options = {}) => (
-    applySession(Group.findOne({ name }), options)
-);
-
 const findByCode = async (code, options = {}) => (
     applySession(Group.findOne({ code }), options)
 );
@@ -80,6 +76,5 @@ module.exports = {
     findAllActiveByUser,
     findByCode,
     findById,
-    findByName,
     updateById
 };

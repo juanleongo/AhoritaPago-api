@@ -1,18 +1,21 @@
-const {Schema,model  }=require('mongoose')
+const { Schema, model } = require('mongoose');
 
-const GroupSchema = Schema({
-    name : {
+const GroupSchema = new Schema({
+    name: {
         type: String,
-        required: [true, 'el nombre es obligatorio'],
-        unique: false
-    }, state:{
-        type:Boolean,
-        default:true
-    },admin:{
+        required: [true, 'El nombre es obligatorio'],
+        trim: true
+    },
+    state: {
+        type: Boolean,
+        default: true
+    },
+    admin: {
         type: Schema.Types.ObjectId,
-        ref : 'User',
+        ref: 'User',
         required: true
-    },members: [{
+    },
+    members: [{
         type: Schema.Types.ObjectId,
         ref: 'User'
     }],
@@ -20,7 +23,7 @@ const GroupSchema = Schema({
         type: String,
         required: true,
         unique: true
-    },
-})
+    }
+});
 
-module.exports = model('Group',GroupSchema)
+module.exports = model('Group', GroupSchema);

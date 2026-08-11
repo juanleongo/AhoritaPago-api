@@ -75,17 +75,6 @@ const createGroupService = ({
             );
         }
 
-        const existingGroup = await groupRepository.findByName(
-            groupData.name
-        );
-        if (existingGroup) {
-            throw createHttpError(
-                409,
-                'El nombre del grupo ya está en uso',
-                'GROUP_NAME_ALREADY_IN_USE'
-            );
-        }
-
         for (
             let attempt = 0;
             attempt < MAX_GROUP_CODE_ATTEMPTS;

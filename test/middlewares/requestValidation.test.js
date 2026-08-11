@@ -73,6 +73,42 @@ describe('validación y DTO de solicitud', () => {
         );
     });
 
+    it('rechaza deudores repetidos antes de ejecutar el servicio', async () => {
+        const userId = '507f191e810c19729de860ea';
+        const result = await runValidation(createDebtValidators, {
+            body: {
+                description: 'Cena',
+                value: 100,
+                group: '507f1f77bcf86cd799439011',
+                debtor: [userId, userId]
+            },
+            user: { userId: '507f191e810c19729de860eb' }
+        });
+
+        assert.equal(result.nextCalled, false);
+        assert.equal(result.error.errorCode, 'VALIDATION_ERROR');
+        assert.equal(result.error.details[0].path, 'debtor');
+        assert.match(result.error.details[0].message, /repetidos/i);
+    });
+
+    it('rechaza al acreedor dentro de la lista de deudores', async () => {
+        const creditorId = '507f191e810c19729de860ea';
+        const result = await runValidation(createDebtValidators, {
+            body: {
+                description: 'Cena',
+                value: 100,
+                group: '507f1f77bcf86cd799439011',
+                debtor: [creditorId]
+            },
+            user: { userId: creditorId }
+        });
+
+        assert.equal(result.nextCalled, false);
+        assert.equal(result.error.errorCode, 'VALIDATION_ERROR');
+        assert.equal(result.error.details[0].path, 'debtor');
+        assert.match(result.error.details[0].message, /acreedor/i);
+    });
+
     it('valida y conserva parámetros ObjectId', async () => {
         const id = '507f1f77bcf86cd799439011';
         const result = await runValidation(userIdValidators, {

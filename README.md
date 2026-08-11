@@ -101,6 +101,14 @@ npm run test:watch
 
 Ejecuta las pruebas en modo observación durante el desarrollo.
 
+```bash
+npm run audit:data
+```
+
+Ejecuta una auditoría de solo lectura sobre las deudas existentes y los índices
+de grupos. Requiere `DATABASE_URL` y genera un reporte JSON; no modifica
+documentos ni elimina índices.
+
 ## Arquitectura
 
 El proyecto es un monolito modular organizado por capas:
@@ -147,6 +155,7 @@ Responsabilidad de cada carpeta:
 
 ```text
 src/
+├── audits/        Consultas no destructivas de integridad de datos
 ├── controllers/   Traducción entre HTTP y los casos de uso
 ├── db/            Conexión con MongoDB
 ├── helpers/       Utilidades y errores HTTP
@@ -157,7 +166,9 @@ src/
 └── services/      Reglas de negocio y autorización
 
 test/
+├── audits/        Pruebas de reportes de integridad
 ├── middlewares/   Pruebas de autenticación
+├── models/        Pruebas de restricciones de esquemas
 ├── routes/        Pruebas de protección y orden de rutas
 └── services/      Pruebas de reglas de negocio
 ```
@@ -334,6 +345,8 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 
 ### Grupos
 
+- Los nombres son descriptivos y pueden repetirse entre grupos. El código es
+  el identificador público único.
 - Al crear un grupo se realizan hasta cinco intentos para generar un código
   disponible. Cada código se consulta nuevamente y el índice único de MongoDB
   resuelve posibles colisiones concurrentes antes de reintentar.
@@ -343,6 +356,9 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 
 ### Deudas
 
+- Toda deuda requiere acreedor, uno o más deudores diferentes al acreedor y un
+  valor finito mayor que cero. Estas reglas se aplican en HTTP, servicios y
+  Mongoose.
 - Acreedor y deudor pueden consultar la deuda.
 - Solo el acreedor puede modificar su descripción o eliminarla.
 - Acreedor y deudor pueden marcarla como pagada.
@@ -366,7 +382,7 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 
 | Campo | Descripción |
 |---|---|
-| `name` | Nombre único del grupo. |
+| `name` | Nombre descriptivo; puede repetirse. |
 | `admin` | Usuario administrador. |
 | `members` | Integrantes del grupo. |
 | `code` | Código único del grupo. |
@@ -384,6 +400,29 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 | `debtDate` | Fecha de creación. |
 | `paymentDate` | Fecha de pago. |
 | `state` | `true` si está activa y `false` si está pagada. |
+
+## Auditoría de integridad
+
+Después de endurecer un esquema, Mongoose protege las escrituras nuevas pero
+no corrige automáticamente los documentos históricos. Antes de limpiar datos,
+ejecuta:
+
+```bash
+npm run audit:data
+```
+
+El reporte identifica:
+
+- deudas sin acreedor o sin deudores;
+- elementos nulos y deudores repetidos;
+- acreedores incluidos como deudores;
+- valores ausentes, no numéricos, iguales a cero o negativos;
+- índices globales únicos heredados sobre `Group.name`.
+
+La auditoría no realiza escrituras. Un índice heredado `name_1` puede seguir
+impidiendo nombres repetidos aunque el esquema actual no lo declare. Su
+eliminación y cualquier corrección de documentos debe hacerse por separado,
+con respaldo previo y después de revisar el reporte.
 
 ## Endpoints
 
@@ -578,6 +617,8 @@ Cobertura inicial:
 - Contratos, filtros activos y opciones de sesión de los repositorios.
 - Persistencia de integrantes encapsulada en el repositorio de grupos.
 - Reintentos limitados y colisiones concurrentes al generar códigos de grupo.
+- Reglas de deuda alineadas entre HTTP, servicios y Mongoose.
+- Nombres de grupo repetibles y auditoría no destructiva de datos históricos.
 - Inyección directa de conexión y puerto en `Server`.
 - Propagación de sesiones.
 - Commit y abort de transacciones.

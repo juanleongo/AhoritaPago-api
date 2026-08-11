@@ -1,41 +1,87 @@
-const {Schema,model  }=require('mongoose')
+const { Schema, model } = require('mongoose');
 
-const DebtSchema = Schema({
+const hasDebtors = debtors => (
+    Array.isArray(debtors) && debtors.length > 0
+);
+
+const hasUniqueDebtors = debtors => {
+    if (!Array.isArray(debtors) || !debtors.every(Boolean)) {
+        return true;
+    }
+
+    return new Set(debtors.map(debtorId => debtorId.toString())).size
+        === debtors.length;
+};
+
+const excludesCreditor = function excludesCreditor(debtors) {
+    if (!this.creditor) {
+        return true;
+    }
+
+    const creditorId = this.creditor.toString();
+    return debtors.filter(Boolean).every(
+        debtorId => debtorId.toString() !== creditorId
+    );
+};
+
+const DebtSchema = new Schema({
     description: {
         type: String,
-        required: [true, 'la descripcion es obligatorio']
-    }, state:{
-        type:Boolean,
-        default:true
-    },creditor: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: false 
+        required: [true, 'La descripción es obligatoria'],
+        trim: true
     },
-    debtor: [{
+    state: {
+        type: Boolean,
+        default: true
+    },
+    creditor: {
         type: Schema.Types.ObjectId,
         ref: 'User',
-        required: false 
-    }],
+        required: [true, 'El acreedor es obligatorio']
+    },
+    debtor: {
+        type: [{
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            required: [true, 'Cada deudor es obligatorio']
+        }],
+        validate: [
+            {
+                validator: hasDebtors,
+                message: 'Debe existir al menos un deudor'
+            },
+            {
+                validator: hasUniqueDebtors,
+                message: 'Los deudores no pueden repetirse'
+            },
+            {
+                validator: excludesCreditor,
+                message: 'El acreedor no puede ser deudor'
+            }
+        ]
+    },
     debtDate: {
         type: Date,
         required: true,
-        default: Date.now 
+        default: Date.now
     },
     paymentDate: {
         type: Date,
-        required: false 
+        required: false
     },
-   value: {
-    type: Number,
-    required: [true, 'El valor de la deuda es obligatorio'],
-    min: 0
-  },
-  group: {
+    value: {
+        type: Number,
+        required: [true, 'El valor de la deuda es obligatorio'],
+        validate: {
+            validator: value => Number.isFinite(value) && value > 0,
+            message: 'El valor de la deuda debe ser mayor que cero'
+        }
+    },
+    group: {
         type: Schema.Types.ObjectId,
         ref: 'Group',
         required: true
-    },
-})
+    }
+});
 
-module.exports = model('Debt',DebtSchema)
+module.exports = model('Debt', DebtSchema);

@@ -4,6 +4,7 @@
   "description": "app para la gestion de deudas con amigos y familiares",
   "main": "index.js",
   "scripts": {
+    "audit:data": "node scripts/auditDataIntegrity.js",
     "dev": "nodemon index.js",
     "start": "node index.js",
     "test": "node --test",

@@ -23,7 +23,28 @@ const createDebtValidators = [
         .withMessage('El grupo debe ser un ObjectId válido.'),
     body('debtor')
         .isArray({ min: 1 })
-        .withMessage('La lista de deudores debe contener al menos un usuario.'),
+        .withMessage('La lista de deudores debe contener al menos un usuario.')
+        .bail()
+        .custom(debtors => (
+            new Set(debtors.map(debtorId => String(debtorId))).size
+            === debtors.length
+        ))
+        .withMessage(
+            'La lista de deudores no puede contener usuarios repetidos.'
+        )
+        .bail()
+        .custom((debtors, { req }) => {
+            const creditorId = req.user?.userId;
+
+            if (!creditorId) {
+                return true;
+            }
+
+            return !debtors.some(
+                debtorId => String(debtorId) === creditorId.toString()
+            );
+        })
+        .withMessage('El acreedor no puede registrarse como deudor.'),
     body('debtor.*')
         .isMongoId()
         .withMessage('Cada deudor debe ser un ObjectId válido.')

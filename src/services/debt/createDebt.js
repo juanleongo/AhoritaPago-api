@@ -3,9 +3,18 @@ const { createHttpError } = require('../../helpers/httpError');
 const validateDebtInput = (debtData, creditorId) => {
     const { description, debtor: debtors, value, group } = debtData;
 
+    if (!creditorId) {
+        throw createHttpError(
+            400,
+            'Se requiere un acreedor para crear la deuda.',
+            'DEBT_CREDITOR_REQUIRED'
+        );
+    }
+
     if (
         !description
-        || !value
+        || value === undefined
+        || value === null
         || !group
         || !Array.isArray(debtors)
         || debtors.length === 0

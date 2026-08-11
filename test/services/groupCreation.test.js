@@ -25,9 +25,6 @@ const createTestService = ({
             async findByCode(code) {
                 calls.findByCode.push(code);
                 return findByCode(code);
-            },
-            async findByName() {
-                return null;
             }
         },
         userRepository: {}
@@ -79,6 +76,24 @@ describe('groupService: generación de códigos únicos', () => {
             ['USED01', 'USED02', 'FREE01']
         );
         assert.equal(calls.create.length, 1);
+    });
+
+    it('permite crear grupos distintos con el mismo nombre', async () => {
+        const { calls, service } = createTestService({
+            codes: ['CODE01', 'CODE02'],
+            create: async data => data,
+            findByCode: async () => null
+        });
+
+        const firstGroup = await createGroup(service);
+        const secondGroup = await createGroup(service);
+
+        assert.equal(firstGroup.name, 'Viaje');
+        assert.equal(secondGroup.name, 'Viaje');
+        assert.deepEqual(
+            calls.create.map(group => group.code),
+            ['CODE01', 'CODE02']
+        );
     });
 
     it('reintenta si el índice único detecta una colisión concurrente', async () => {

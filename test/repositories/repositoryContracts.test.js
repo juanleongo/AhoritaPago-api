@@ -46,7 +46,6 @@ describe('contratos de repositorios', () => {
             'findAllActiveByUser',
             'findByCode',
             'findById',
-            'findByName',
             'updateById'
         ]);
     });
