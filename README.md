@@ -162,6 +162,70 @@ test/
 └── services/      Pruebas de reglas de negocio
 ```
 
+### Inyección de dependencias y composition root
+
+La aplicación ensambla todas sus dependencias de ejecución en
+`src/compositionRoot.js`:
+
+```text
+Repositorios + infraestructura
+              |
+              v
+          Servicios
+              |
+              v
+         Controladores
+              |
+              v
+            Routers
+              |
+              v
+            Server
+```
+
+El composition root construye e inyecta:
+
+- repositorios de usuarios, grupos y deudas;
+- bcrypt como proveedor de contraseñas;
+- JWT y la función que obtiene el secreto;
+- Mongoose para los casos de uso transaccionales;
+- servicios, middleware de autenticación, controladores y routers.
+
+Los servicios no reciben estas dependencias desde variables globales dentro de
+su lógica. Se construyen mediante fábricas ubicadas en
+`src/services/factories/` y `src/services/debt/`. Controladores y routers
+también exponen fábricas para recibir servicios y handlers ya construidos.
+
+`Server` acepta opcionalmente `compositionRoot`, `connection` y `port`, lo que
+permite probar su arranque sin modificar `require.cache`. Los módulos públicos
+anteriores se conservan como fachadas de compatibilidad para consumidores que
+todavía los importen directamente.
+
+### Casos de uso de deudas
+
+El dominio de deudas está dividido por operación para que cada módulo tenga
+una única razón de cambio:
+
+```text
+src/services/
+├── debtservice.js                 Fachada pública compatible
+└── debt/
+    ├── debtAccess.js              Identidad, participación y búsqueda común
+    ├── createDebt.js              Creación transaccional
+    ├── deleteDebt.js              Eliminación y reversión de saldos
+    ├── getAllDebts.js             Listado de deudas activas
+    ├── getDebtById.js             Consulta autorizada por ID
+    ├── getDebtHistoryForUser.js   Historial activo y pagado
+    ├── getDebtSummaryForUser.js   Resumen de deudas y créditos
+    ├── getDebtsForUserInGroupByCode.js
+    ├── markAsPaid.js              Pago transaccional
+    └── updateDebt.js              Actualización autorizada
+```
+
+Los controladores continúan importando `debtservice.js`. La fachada conserva
+las mismas nueve funciones públicas y delega cada una al caso de uso
+correspondiente, evitando cambios en rutas o consumidores existentes.
+
 ## Autenticación
 
 Después de iniciar sesión, las rutas protegidas requieren:
@@ -475,6 +539,10 @@ Cobertura inicial:
 - Membresía y administración de grupos.
 - Incorporación de integrantes.
 - Separación y orden del historial.
+- Compatibilidad de la fachada y separación de casos de uso de deudas.
+- Propagación de dependencias desde composition root hasta routers.
+- Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
+- Inyección directa de conexión y puerto en `Server`.
 - Propagación de sesiones.
 - Commit y abort de transacciones.
 - Reversión de saldos al eliminar deudas.

@@ -2,11 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const { connection } = require('../db/config');
 const { errorHandler, notFoundHandler } = require('../middlewares');
+const { createCompositionRoot } = require('../compositionRoot');
 class Server {
      
-    constructor() {
+    constructor(options = {}) {
        this.app = express()
-       this.port = process.env.PORT 
+       this.port = options.port || process.env.PORT
+       this.connection = options.connection || connection
+       this.compositionRoot = (
+        options.compositionRoot || createCompositionRoot()
+       )
        this.paths = {
         auth:       '/api/auth',
         group:       '/api/group',
@@ -27,7 +32,7 @@ class Server {
 
     }
     async conectarDB() {
-        await connection();
+        await this.connection();
     }
 
     middleware() {
@@ -39,10 +44,10 @@ class Server {
     }
 
     routes() {
-        this.app.use( this.paths.group, require('../routes/group'))
-        this.app.use(this.paths.user, require('../routes/user'))
-        this.app.use(this.paths.auth, require('../routes/auth'))
-        this.app.use(this.paths.payment, require('../routes/debt'))
+        this.app.use(this.paths.group, this.compositionRoot.routers.group)
+        this.app.use(this.paths.user, this.compositionRoot.routers.user)
+        this.app.use(this.paths.auth, this.compositionRoot.routers.auth)
+        this.app.use(this.paths.payment, this.compositionRoot.routers.debt)
         
     }
 

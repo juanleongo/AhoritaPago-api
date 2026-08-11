@@ -1,9 +1,10 @@
-const {Router} = require('express')
+const { Router } = require('express');
 const {
     allowOnlyFields,
-    authVerify,
+    authVerify: defaultAuthVerify,
     validateForms
 } = require('../middlewares');
+const defaultGroupController = require('../controllers/group');
 const {
     addGroupMemberValidators,
     createGroupValidators,
@@ -11,40 +12,47 @@ const {
     updateGroupValidators
 } = require('../validators/groupValidators');
 
-const {addMember, getAllGroups ,getGroupById, createGroup,updateGroup,deleteGroup, getUserGroups} = require('../controllers/group');
+const createGroupRouter = ({ authVerify, groupController }) => {
+    const router = Router();
 
-const router = Router()
+    router.use(authVerify);
 
-// Todas las operaciones de grupos requieren un JWT válido.
-router.use(authVerify)
+    router.get('/mygroups', groupController.getUserGroups);
+    router.get('/', groupController.getAllGroups);
+    router.get('/:id', [
+        ...groupIdValidators,
+        validateForms
+    ], groupController.getGroupById);
 
-router.get('/mygroups', getUserGroups);
-router.get('/', getAllGroups)
-router.get('/:id', [
-    ...groupIdValidators,
-    validateForms
-], getGroupById)
+    router.post('/', [
+        allowOnlyFields(['name']),
+        ...createGroupValidators,
+        validateForms
+    ], groupController.createGroup);
 
-router.post('/', [
-    allowOnlyFields(['name']),
-    ...createGroupValidators,
-    validateForms
-], createGroup);
+    router.post('/addMember', [
+        allowOnlyFields(['groupCode', 'userNick']),
+        ...addGroupMemberValidators,
+        validateForms
+    ], groupController.addMember);
+    router.put('/:id', [
+        allowOnlyFields(['name']),
+        ...updateGroupValidators,
+        validateForms
+    ], groupController.updateGroup);
+    router.delete('/:id', [
+        allowOnlyFields([]),
+        ...groupIdValidators,
+        validateForms
+    ], groupController.deleteGroup);
 
-router.post('/addMember', [
-    allowOnlyFields(['groupCode', 'userNick']),
-    ...addGroupMemberValidators,
-    validateForms
-], addMember);
-router.put('/:id', [
-    allowOnlyFields(['name']),
-    ...updateGroupValidators,
-    validateForms
-], updateGroup)
-router.delete('/:id', [
-    allowOnlyFields([]),
-    ...groupIdValidators,
-    validateForms
-], deleteGroup)
+    return router;
+};
 
-module.exports= router
+const router = createGroupRouter({
+    authVerify: defaultAuthVerify,
+    groupController: defaultGroupController
+});
+
+module.exports = router;
+module.exports.createGroupRouter = createGroupRouter;

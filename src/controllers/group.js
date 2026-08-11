@@ -6,66 +6,79 @@ const {
     updateGroupDto
 } = require('../dtos/groupDtos');
 
-const getAllGroups = asyncHandler(async (req, res) => {
-    const groups = await groupService.getAllGroups(req.user.userId);
-    res.status(200).json(groups);
-});
+const createGroupController = ({ groupService }) => {
+    const getAllGroups = asyncHandler(async (req, res) => {
+        const groups = await groupService.getAllGroups(req.user.userId);
+        res.status(200).json(groups);
+    });
 
-const getGroupById = asyncHandler(async (req, res) => {
-    const group = await groupService.getGroupById(
-        req.validated.params.id,
-        req.user.userId
-    );
+    const getGroupById = asyncHandler(async (req, res) => {
+        const group = await groupService.getGroupById(
+            req.validated.params.id,
+            req.user.userId
+        );
 
-    res.status(200).json(group);
-});
+        res.status(200).json(group);
+    });
 
-const getUserGroups = asyncHandler(async (req, res) => {
-    const result = await groupService.getGroupsForUser(req.user.userId);
-    res.status(200).json(result.data);
-});
+    const getUserGroups = asyncHandler(async (req, res) => {
+        const result = await groupService.getGroupsForUser(req.user.userId);
+        res.status(200).json(result.data);
+    });
 
-const createGroup = asyncHandler(async (req, res) => {
-    const groupData = createGroupDto(req.validated.body);
-    const newGroup = await groupService.createGroup(groupData, req.user);
-    res.status(201).json(newGroup);
-});
+    const createGroup = asyncHandler(async (req, res) => {
+        const groupData = createGroupDto(req.validated.body);
+        const newGroup = await groupService.createGroup(groupData, req.user);
+        res.status(201).json(newGroup);
+    });
 
-const updateGroup = asyncHandler(async (req, res) => {
-    const updatedGroup = await groupService.updateGroup(
-        req.validated.params.id,
-        updateGroupDto(req.validated.body),
-        req.user.userId
-    );
+    const updateGroup = asyncHandler(async (req, res) => {
+        const updatedGroup = await groupService.updateGroup(
+            req.validated.params.id,
+            updateGroupDto(req.validated.body),
+            req.user.userId
+        );
 
-    res.status(200).json(updatedGroup);
-});
+        res.status(200).json(updatedGroup);
+    });
 
-const deleteGroup = asyncHandler(async (req, res) => {
-    await groupService.deleteGroup(
-        req.validated.params.id,
-        req.user.userId
-    );
-    res.status(200).json({ message: 'Grupo eliminado correctamente' });
-});
+    const deleteGroup = asyncHandler(async (req, res) => {
+        await groupService.deleteGroup(
+            req.validated.params.id,
+            req.user.userId
+        );
+        res.status(200).json({
+            message: 'Grupo eliminado correctamente'
+        });
+    });
 
-const addMember = asyncHandler(async (req, res) => {
-    const { groupCode, userNick } = addGroupMemberDto(req.validated.body);
-    const result = await groupService.addMemberToGroup(
-        groupCode,
-        userNick,
-        req.user.userId
-    );
+    const addMember = asyncHandler(async (req, res) => {
+        const { groupCode, userNick } = addGroupMemberDto(
+            req.validated.body
+        );
+        const result = await groupService.addMemberToGroup(
+            groupCode,
+            userNick,
+            req.user.userId
+        );
 
-    res.status(200).json(result);
-});
+        res.status(200).json(result);
+    });
+
+    return {
+        addMember,
+        createGroup,
+        deleteGroup,
+        getAllGroups,
+        getGroupById,
+        getUserGroups,
+        updateGroup
+    };
+};
+
+const defaultController = createGroupController({ groupService });
 
 module.exports = {
-    addMember,
-    getAllGroups,
-    getGroupById,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    getUserGroups
+    ...defaultController,
+    createGroupController
 };

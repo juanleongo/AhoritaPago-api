@@ -1,9 +1,10 @@
-const {Router} = require('express')
+const { Router } = require('express');
 const {
     allowOnlyFields,
-    authVerify,
+    authVerify: defaultAuthVerify,
     validateForms
 } = require('../middlewares');
+const defaultUserController = require('../controllers/user');
 const {
     createUserValidators,
     nicknameLookupValidators,
@@ -12,44 +13,49 @@ const {
     userIdValidators
 } = require('../validators/userValidators');
 
-const {getAllUsers,getUserById, createUser,updateUser,deleteUser,getByNickname,getUserByToken,searchUsers} = require('../controllers/user')
+const createUserRouter = ({ authVerify, userController }) => {
+    const router = Router();
 
-const router = Router()
+    router.post('/', [
+        allowOnlyFields(['name', 'nickname', 'email', 'password']),
+        ...createUserValidators,
+        validateForms
+    ], userController.createUser);
 
-// El registro es la única operación pública de usuarios.
-router.post('/', [
-    allowOnlyFields(['name', 'nickname', 'email', 'password']),
-    ...createUserValidators,
-    validateForms
-], createUser)
+    router.use(authVerify);
 
-// Todas las rutas declaradas después de este punto requieren un JWT válido.
-router.use(authVerify)
+    router.get('/nick', [
+        allowOnlyFields(['nick']),
+        ...nicknameLookupValidators,
+        validateForms
+    ], userController.getByNickname);
+    router.get('/search/:searchTerm', [
+        ...searchUsersValidators,
+        validateForms
+    ], userController.searchUsers);
+    router.get('/:id', [
+        ...userIdValidators,
+        validateForms
+    ], userController.getUserById);
+    router.get('/', userController.getUserByToken);
+    router.put('/:id', [
+        allowOnlyFields(['name', 'nickname', 'email']),
+        ...updateUserValidators,
+        validateForms
+    ], userController.updateUser);
+    router.delete('/:id', [
+        allowOnlyFields([]),
+        ...userIdValidators,
+        validateForms
+    ], userController.deleteUser);
 
-//router.get('/', getAllUsers)
-router.get('/nick', [
-    allowOnlyFields(['nick']),
-    ...nicknameLookupValidators,
-    validateForms
-], getByNickname)
-router.get('/search/:searchTerm', [
-    ...searchUsersValidators,
-    validateForms
-], searchUsers);
-router.get('/:id', [
-    ...userIdValidators,
-    validateForms
-], getUserById)
-router.get('/', getUserByToken);
-router.put('/:id', [
-    allowOnlyFields(['name', 'nickname', 'email']),
-    ...updateUserValidators,
-    validateForms
-], updateUser)
-router.delete('/:id', [
-    allowOnlyFields([]),
-    ...userIdValidators,
-    validateForms
-], deleteUser)
+    return router;
+};
 
-module.exports= router
+const router = createUserRouter({
+    authVerify: defaultAuthVerify,
+    userController: defaultUserController
+});
+
+module.exports = router;
+module.exports.createUserRouter = createUserRouter;

@@ -1,10 +1,10 @@
-// src/routes/debt.js
 const { Router } = require('express');
 const {
     allowOnlyFields,
-    authVerify,
+    authVerify: defaultAuthVerify,
     validateForms
 } = require('../middlewares');
+const defaultDebtController = require('../controllers/debt');
 const {
     createDebtValidators,
     debtIdValidators,
@@ -12,68 +12,52 @@ const {
 } = require('../validators/debtValidators');
 const { groupCodeValidators } = require('../validators/groupValidators');
 
-const {
-    getAllDebts,
-    getDebtById,
-    createDebt,
-    updateDebt,
-    deleteDebt,
-    markAsPay,
-    getDebtSummary,
-    getDebtHistory,
-    getDebtsInGroup
-} = require('../controllers/debt');
+const createDebtRouter = ({ authVerify, debtController }) => {
+    const router = Router();
 
-const router = Router();
+    router.use(authVerify);
 
-// Todas las operaciones de deudas y pagos requieren un JWT válido.
-router.use(authVerify);
+    router.get('/summary', debtController.getDebtSummary);
+    router.get('/history', debtController.getDebtHistory);
+    router.get('/group/:groupCode', [
+        ...groupCodeValidators,
+        validateForms
+    ], debtController.getDebtsInGroup);
+    router.get('/:id', [
+        ...debtIdValidators,
+        validateForms
+    ], debtController.getDebtById);
+    router.get('/', debtController.getAllDebts);
 
-router.get('/summary', getDebtSummary);
+    router.post('/', [
+        allowOnlyFields(['description', 'value', 'group', 'debtor']),
+        ...createDebtValidators,
+        validateForms
+    ], debtController.createDebt);
 
-router.get('/history', getDebtHistory);
+    router.put('/:id', [
+        allowOnlyFields(['description']),
+        ...updateDebtValidators,
+        validateForms
+    ], debtController.updateDebt);
+    router.put('/pay/:id', [
+        allowOnlyFields([]),
+        ...debtIdValidators,
+        validateForms
+    ], debtController.markAsPay);
+    router.delete('/:id', [
+        allowOnlyFields([]),
+        ...debtIdValidators,
+        validateForms
+    ], debtController.deleteDebt);
 
-router.get('/group/:groupCode', [
-    ...groupCodeValidators,
-    validateForms
-], getDebtsInGroup);
+    return router;
+};
 
-
-// 2. Rutas dinámicas (que usan un parámetro como :id)
-// se definen DESPUÉS de las rutas específicas.
-
-router.get('/:id', [
-    ...debtIdValidators,
-    validateForms
-], getDebtById);
-
-
-// --- Resto de las rutas ---
-
-router.get('/', getAllDebts);
-
-router.post('/', [
-    allowOnlyFields(['description', 'value', 'group', 'debtor']),
-    ...createDebtValidators,
-    validateForms
-], createDebt);
-
-router.put('/:id', [
-    allowOnlyFields(['description']),
-    ...updateDebtValidators,
-    validateForms
-], updateDebt);
-
-router.put('/pay/:id', [
-    allowOnlyFields([]),
-    ...debtIdValidators,
-    validateForms
-], markAsPay);
-
-router.delete('/:id', [
-    allowOnlyFields([]),
-    ...debtIdValidators,
-    validateForms
-], deleteDebt);
+const router = createDebtRouter({
+    authVerify: defaultAuthVerify,
+    debtController: defaultDebtController
+});
 
 module.exports = router;
+module.exports.createDebtRouter = createDebtRouter;
