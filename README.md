@@ -196,6 +196,29 @@ su lógica. Se construyen mediante fábricas ubicadas en
 `src/services/factories/` y `src/services/debt/`. Controladores y routers
 también exponen fábricas para recibir servicios y handlers ya construidos.
 
+### Contratos de repositorios
+
+Los tres repositorios utilizan la misma convención de nombres:
+
+- `find...` para consultas;
+- `create` para inserciones;
+- `updateById` para actualizaciones;
+- `deactivateById` para eliminaciones lógicas;
+- `deleteById` solo cuando la eliminación es física.
+
+Todas las operaciones aceptan un objeto `options` como último argumento. Una
+sesión de MongoDB se entrega siempre como `{ session }`; no se usan argumentos
+posicionales distintos entre repositorios. Los filtros forman parte del nombre
+del método: por ejemplo, `findActiveById`, `findActiveByParticipant` y
+`findHistoryByParticipant` hacen explícito si se consultan registros activos o
+el historial completo.
+
+Las operaciones de persistencia también quedan dentro del repositorio. Por
+ejemplo, el servicio de grupos usa `addMemberById` y no modifica documentos de
+Mongoose ni ejecuta `save()` directamente. Este contrato permite reemplazar
+un repositorio desde el composition root sin que el caso de uso conozca los
+detalles de MongoDB.
+
 `Server` acepta opcionalmente `compositionRoot`, `connection` y `port`, lo que
 permite probar su arranque sin modificar `require.cache`. Los módulos públicos
 anteriores se conservan como fachadas de compatibilidad para consumidores que
@@ -542,6 +565,8 @@ Cobertura inicial:
 - Compatibilidad de la fachada y separación de casos de uso de deudas.
 - Propagación de dependencias desde composition root hasta routers.
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
+- Contratos, filtros activos y opciones de sesión de los repositorios.
+- Persistencia de integrantes encapsulada en el repositorio de grupos.
 - Inyección directa de conexión y puerto en `Server`.
 - Propagación de sesiones.
 - Commit y abort de transacciones.

@@ -28,7 +28,7 @@ const createUpdateDebt = ({ debtAccess, debtRepository }) => {
             );
         }
 
-        return debtRepository.updateDebt(
+        return debtRepository.updateById(
             id,
             { description: debtData.description }
         );

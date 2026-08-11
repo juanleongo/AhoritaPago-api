@@ -38,7 +38,10 @@ const createDeleteDebt = ({
                     }
                 }
 
-                deletedDebt = await debtRepository.deleteDebt(id, session);
+                deletedDebt = await debtRepository.deleteById(
+                    id,
+                    { session }
+                );
             });
         } finally {
             await session.endSession();

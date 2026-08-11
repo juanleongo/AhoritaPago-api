@@ -5,7 +5,7 @@ const isSameUser = (userId, authenticatedUserId) => (
 );
 
 const createUserService = ({ userRepository, passwordHasher }) => {
-    const getAllUsers = async () => userRepository.getAllUsers();
+    const getAllUsers = async () => userRepository.findAllActive();
 
     const getUserById = async (id, authenticatedUserId) => {
         if (!isSameUser(id, authenticatedUserId)) {
@@ -16,7 +16,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const user = await userRepository.getUserById(id);
+        const user = await userRepository.findActiveById(id);
         if (!user) {
             throw createHttpError(
                 404,
@@ -29,7 +29,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
     };
 
     const getByNickname = async nickname => {
-        const user = await userRepository.getUserByNickName(nickname);
+        const user = await userRepository.findActiveByNickname(nickname);
         if (!user) {
             throw createHttpError(
                 404,
@@ -50,11 +50,11 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        return userRepository.findUsersByNicknameSearch(searchTerm);
+        return userRepository.searchActiveByNickname(searchTerm);
     };
 
     const getUserByToken = async token => {
-        const user = await userRepository.getUserByToken(token.userId);
+        const user = await userRepository.findActiveById(token.userId);
         if (!user) {
             throw createHttpError(
                 404,
@@ -77,7 +77,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const existingEmail = await userRepository.getUserByEmail(email);
+        const existingEmail = await userRepository.findByEmail(email);
         if (existingEmail) {
             throw createHttpError(
                 409,
@@ -86,7 +86,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const nicknameUser = await userRepository.getUserByNickName(nickname);
+        const nicknameUser = await userRepository.findByNickname(nickname);
         if (nicknameUser) {
             throw createHttpError(
                 409,
@@ -98,7 +98,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
         const salt = await passwordHasher.genSalt();
         const hashedPassword = await passwordHasher.hash(password, salt);
 
-        return userRepository.createUser({
+        return userRepository.create({
             name,
             email,
             nickname,
@@ -115,7 +115,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const existingUser = await userRepository.getUserById(id);
+        const existingUser = await userRepository.findActiveById(id);
         if (!existingUser) {
             throw createHttpError(
                 404,
@@ -139,7 +139,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        return userRepository.updateUser(id, allowedData);
+        return userRepository.updateById(id, allowedData);
     };
 
     const deleteUser = async (id, authenticatedUserId) => {
@@ -151,7 +151,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        const existingUser = await userRepository.getUserById(id);
+        const existingUser = await userRepository.findActiveById(id);
         if (!existingUser) {
             throw createHttpError(
                 404,
@@ -160,7 +160,7 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        return userRepository.deleteUser(id);
+        return userRepository.deactivateById(id);
     };
 
     const incrementUserBalances = async (
@@ -168,7 +168,10 @@ const createUserService = ({ userRepository, passwordHasher }) => {
         balanceChanges,
         session = null
     ) => {
-        const existingUser = await userRepository.getUserById(id, session);
+        const existingUser = await userRepository.findActiveById(
+            id,
+            { session }
+        );
         if (!existingUser) {
             throw createHttpError(
                 404,
@@ -192,10 +195,10 @@ const createUserService = ({ userRepository, passwordHasher }) => {
             );
         }
 
-        return userRepository.updateUser(
+        return userRepository.updateById(
             id,
             { $inc: safeChanges },
-            session
+            { session }
         );
     };
 

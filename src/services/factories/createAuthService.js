@@ -7,7 +7,7 @@ const createAuthService = ({
     getJwtSecret
 }) => {
     const login = async (email, password) => {
-        const user = await userRepository.getUserByEmail(email);
+        const user = await userRepository.findByEmail(email);
         if (!user) {
             throw createHttpError(
                 401,

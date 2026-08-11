@@ -7,7 +7,7 @@ const newestFirst = dateField => (firstDebt, secondDebt) => {
 
 const createGetDebtHistoryForUser = ({ debtRepository }) => {
     const getDebtHistoryForUser = async userId => {
-        const debts = await debtRepository.findDebtHistoryByUserId(userId);
+        const debts = await debtRepository.findHistoryByParticipant(userId);
 
         const active = debts
             .filter(debt => debt.state)

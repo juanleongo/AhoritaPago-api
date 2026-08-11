@@ -5,24 +5,16 @@ const { createCompositionRoot } = require('../../src/compositionRoot');
 const createInjectedDependencies = () => {
     const calls = [];
     const userRepository = {
-        async getUserById(id) {
-            calls.push(['getUserById', id]);
-            return { _id: id, state: true };
+        async findActiveById(id) {
+            calls.push(['findActiveById', id]);
+            return { _id: id, nickname: 'usuario', state: true };
         },
-        async getUserByEmail(email) {
-            calls.push(['getUserByEmail', email]);
+        async findByEmail(email) {
+            calls.push(['findByEmail', email]);
             return {
                 _id: 'user-1',
                 nickname: 'usuario',
                 password: 'hash',
-                state: true
-            };
-        },
-        async getActiveUserById(id) {
-            calls.push(['getActiveUserById', id]);
-            return {
-                _id: id,
-                nickname: 'usuario',
                 state: true
             };
         }
@@ -84,8 +76,8 @@ describe('composition root e inyección de dependencias', () => {
         assert.equal(user._id, 'user-1');
         assert.equal(token, 'injected-token');
         assert.deepEqual(calls, [
-            ['getUserById', 'user-1'],
-            ['getUserByEmail', 'user@example.com'],
+            ['findActiveById', 'user-1'],
+            ['findByEmail', 'user@example.com'],
             ['compare', 'password', 'hash'],
             [
                 'sign',
@@ -112,7 +104,7 @@ describe('composition root e inyección de dependencias', () => {
         assert.equal(req.user.nick, 'usuario');
         assert.deepEqual(calls, [
             ['verify', 'raw-token', 'injected-secret'],
-            ['getActiveUserById', 'user-1']
+            ['findActiveById', 'user-1']
         ]);
     });
 

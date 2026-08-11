@@ -5,7 +5,7 @@ const createGetDebtsForUserInGroupByCode = ({
     groupRepository
 }) => {
     const getDebtsForUserInGroupByCode = async (userId, groupCode) => {
-        const group = await groupRepository.getGroupByCode(groupCode);
+        const group = await groupRepository.findActiveByCode(groupCode);
 
         if (!group) {
             throw createHttpError(
@@ -27,7 +27,10 @@ const createGetDebtsForUserInGroupByCode = ({
             );
         }
 
-        return debtRepository.findDebtsForUserInGroup(userId, group._id);
+        return debtRepository.findActiveByParticipantAndGroup(
+            userId,
+            group._id
+        );
     };
 
     return getDebtsForUserInGroupByCode;

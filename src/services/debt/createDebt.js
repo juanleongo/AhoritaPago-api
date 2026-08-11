@@ -107,9 +107,9 @@ const createCreateDebt = ({
 
         try {
             await session.withTransaction(async () => {
-                const targetGroup = await groupRepository.getGroupyId(
+                const targetGroup = await groupRepository.findActiveById(
                     group,
-                    session
+                    { session }
                 );
 
                 assertGroupParticipants(targetGroup, creditorId, debtorIds);
@@ -126,9 +126,9 @@ const createCreateDebt = ({
                         creditor: creditorId
                     };
 
-                    const createdDebt = await debtRepository.createDebt(
+                    const createdDebt = await debtRepository.create(
                         newDebtData,
-                        session
+                        { session }
                     );
                     transactionDebts.push(createdDebt);
 

@@ -25,15 +25,14 @@ const buildGroup = () => ({
     _id: 'group-1',
     admin: 'admin',
     members: ['admin', 'member'],
-    name: 'Amigos',
-    async save() {}
+    name: 'Amigos'
 });
 
 describe('groupService: membresía y administración', () => {
     it('permite consultar un grupo a sus integrantes', async () => {
         await withStubs(
             groupRepository,
-            { getGroupyId: async () => buildGroup() },
+            { findActiveById: async () => buildGroup() },
             async () => {
                 const group = await groupService.getGroupById(
                     'group-1',
@@ -48,7 +47,7 @@ describe('groupService: membresía y administración', () => {
     it('rechaza la consulta de un usuario externo', async () => {
         await withStubs(
             groupRepository,
-            { getGroupyId: async () => buildGroup() },
+            { findActiveById: async () => buildGroup() },
             async () => {
                 await assert.rejects(
                     () => groupService.getGroupById('group-1', 'outsider'),
@@ -64,8 +63,8 @@ describe('groupService: membresía y administración', () => {
         await withStubs(
             groupRepository,
             {
-                getGroupyId: async () => buildGroup(),
-                updateGroup: async (id, data) => {
+                findActiveById: async () => buildGroup(),
+                updateById: async (id, data) => {
                     updatedData = { id, data };
                     return updatedData;
                 }
@@ -96,42 +95,52 @@ describe('groupService: membresía y administración', () => {
 
     it('permite a cualquier integrante agregar una persona', async () => {
         const group = buildGroup();
-        let saved = false;
-        group.save = async () => {
-            saved = true;
+        let persistedMember;
+        const updatedGroup = {
+            ...group,
+            members: [...group.members, 'new-member']
         };
 
         await withStubs(
             groupRepository,
-            { getGroupByCode: async () => group },
+            {
+                findActiveByCode: async () => group,
+                addMemberById: async (groupId, userId) => {
+                    persistedMember = { groupId, userId };
+                    return updatedGroup;
+                }
+            },
             async () => {
                 await withStubs(
                     userRepository,
                     {
-                        getUserByNickName: async () => ({
+                        findActiveByNickname: async () => ({
                             _id: 'new-member',
                             nickname: 'nuevo'
                         })
                     },
                     async () => {
-                        await groupService.addMemberToGroup(
+                        const result = await groupService.addMemberToGroup(
                             'CODE',
                             'nuevo',
                             'member'
                         );
+                        assert.equal(result.group, updatedGroup);
                     }
                 );
             }
         );
 
-        assert.equal(saved, true);
-        assert.ok(group.members.includes('new-member'));
+        assert.deepEqual(persistedMember, {
+            groupId: 'group-1',
+            userId: 'new-member'
+        });
     });
 
     it('impide agregar miembros a un usuario externo al grupo', async () => {
         await withStubs(
             groupRepository,
-            { getGroupByCode: async () => buildGroup() },
+            { findActiveByCode: async () => buildGroup() },
             async () => {
                 await assert.rejects(
                     () => groupService.addMemberToGroup(

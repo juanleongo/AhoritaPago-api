@@ -49,7 +49,7 @@ const createAuthVerify = ({
         }
 
         try {
-            const activeUser = await userRepository.getActiveUserById(
+            const activeUser = await userRepository.findActiveById(
                 user.userId
             );
 

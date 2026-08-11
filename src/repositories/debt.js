@@ -1,76 +1,97 @@
 const Debt = require('../models/debt');
+const {
+    applySession,
+    buildWriteOptions
+} = require('./repositoryOptions');
 
-const createDebt = async (debtData, session = null) => {
+const create = async (debtData, options = {}) => {
     const debt = new Debt(debtData);
-    return await debt.save({ session });
+    return debt.save(buildWriteOptions(options));
 };
 
-const deleteDebt = async (id, session = null) => {
-    return await Debt.findByIdAndDelete(id, { session });
-};
+const deleteById = async (id, options = {}) => (
+    Debt.findByIdAndDelete(id, buildWriteOptions(options))
+);
 
-const updateDebt = async (id, debtData, session = null) => {
-    return await Debt.findByIdAndUpdate(
+const updateById = async (id, debtData, options = {}) => (
+    Debt.findByIdAndUpdate(
         id,
         debtData,
-        { new: true, runValidators: true, session }
-    );
-};
+        buildWriteOptions(options, { new: true, runValidators: true })
+    )
+);
 
-const getAllDebtsForUser = async (userId) => {
-    return await Debt.find({ debtor: userId, state: true })
-        .populate('debtor', 'name')
-        .populate('creditor', 'name');
-};
+const findById = async (id, options = {}) => (
+    applySession(Debt.findById(id), options)
+);
 
-const getDebtById = async (id, session = null) => {
-    return await Debt.findById(id).session(session);
-};
+const findActiveByDebtor = async (userId, options = {}) => (
+    applySession(
+        Debt.find({ debtor: userId, state: true })
+            .populate('debtor', 'name')
+            .populate('creditor', 'name'),
+        options
+    )
+);
 
-const findDebtsAndCreditsByUserId = async (userId) => {
-    return await Debt.find({
-        $or: [
-            { creditor: userId },
-            { debtor: userId }
-        ],
-        state: true
-    })
-    // ¡Esta es la parte clave!
-    // .populate() reemplaza los IDs de los usuarios con sus documentos completos.
-    .populate('group', 'name')
-    .populate('creditor', 'name nickname') // Traemos nombre y nickname del acreedor
-    .populate('debtor', 'name nickname');   // Traemos nombre y nickname del deudor
-};
+const findActiveByParticipant = async (userId, options = {}) => (
+    applySession(
+        Debt.find({
+            $or: [
+                { creditor: userId },
+                { debtor: userId }
+            ],
+            state: true
+        })
+            .populate('group', 'name')
+            .populate('creditor', 'name nickname')
+            .populate('debtor', 'name nickname'),
+        options
+    )
+);
 
-const findDebtHistoryByUserId = async (userId) => {
-    return await Debt.find({
-        $or: [
-            { creditor: userId },
-            { debtor: userId }
-        ]
-    })
-    .populate('group', 'name code')
-    .populate('creditor', 'name nickname')
-    .populate('debtor', 'name nickname');
-};
+const findHistoryByParticipant = async (userId, options = {}) => (
+    applySession(
+        Debt.find({
+            $or: [
+                { creditor: userId },
+                { debtor: userId }
+            ]
+        })
+            .populate('group', 'name code')
+            .populate('creditor', 'name nickname')
+            .populate('debtor', 'name nickname'),
+        options
+    )
+);
 
-const findDebtsForUserInGroup = async (userId, groupId) => {
-    return await Debt.find({
-        group: groupId,
-        state: true,
-        $or: [
-            { creditor: userId },
-            { debtor: userId }
-        ]
-    }).populate('creditor', 'name nickname').populate('debtor', 'name nickname'); // Traemos más info útil
-};
+const findActiveByParticipantAndGroup = async (
+    userId,
+    groupId,
+    options = {}
+) => (
+    applySession(
+        Debt.find({
+            group: groupId,
+            state: true,
+            $or: [
+                { creditor: userId },
+                { debtor: userId }
+            ]
+        })
+            .populate('creditor', 'name nickname')
+            .populate('debtor', 'name nickname'),
+        options
+    )
+);
+
 module.exports = {
-    createDebt,
-    deleteDebt,
-    updateDebt,
-    getAllDebtsForUser,
-    getDebtById,
-    findDebtsAndCreditsByUserId,
-    findDebtHistoryByUserId,
-    findDebtsForUserInGroup
+    create,
+    deleteById,
+    findActiveByDebtor,
+    findActiveByParticipant,
+    findActiveByParticipantAndGroup,
+    findById,
+    findHistoryByParticipant,
+    updateById
 };

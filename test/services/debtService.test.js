@@ -46,7 +46,7 @@ describe('debtService: historial y consistencia financiera', () => {
         await withStubs(
             debtRepository,
             {
-                findDebtHistoryByUserId: async userId => {
+                findHistoryByParticipant: async userId => {
                     assert.equal(userId, 'user-1');
                     return [
                         {
@@ -102,8 +102,8 @@ describe('debtService: historial y consistencia financiera', () => {
                 await withStubs(
                     groupRepository,
                     {
-                        getGroupyId: async (id, receivedSession) => {
-                            assert.equal(receivedSession, session);
+                        findActiveById: async (id, options) => {
+                            assert.deepEqual(options, { session });
                             return {
                                 state: true,
                                 members: ['creditor', 'debtor']
@@ -114,8 +114,8 @@ describe('debtService: historial y consistencia financiera', () => {
                         await withStubs(
                             debtRepository,
                             {
-                                createDebt: async (data, receivedSession) => {
-                                    assert.equal(receivedSession, session);
+                                create: async (data, options) => {
+                                    assert.deepEqual(options, { session });
                                     return data;
                                 }
                             },
@@ -178,14 +178,17 @@ describe('debtService: historial y consistencia financiera', () => {
                 await withStubs(
                     debtRepository,
                     {
-                        getDebtById: async () => ({
+                        findById: async (id, options) => {
+                            assert.deepEqual(options, { session });
+                            return {
                             creditor: 'creditor',
                             debtor: ['debtor'],
                             value: 30,
                             state: true
-                        }),
-                        deleteDebt: async (id, receivedSession) => {
-                            assert.equal(receivedSession, session);
+                            };
+                        },
+                        deleteById: async (id, options) => {
+                            assert.deepEqual(options, { session });
                             return { _id: id };
                         }
                     },
@@ -232,7 +235,7 @@ describe('debtService: historial y consistencia financiera', () => {
                 await withStubs(
                     groupRepository,
                     {
-                        getGroupyId: async () => ({
+                        findActiveById: async () => ({
                             state: true,
                             members: ['creditor', 'debtor']
                         })
@@ -240,7 +243,7 @@ describe('debtService: historial y consistencia financiera', () => {
                     async () => {
                         await withStubs(
                             debtRepository,
-                            { createDebt: async data => data },
+                            { create: async data => data },
                             async () => {
                                 await withStubs(
                                     userService,

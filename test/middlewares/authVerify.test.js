@@ -47,13 +47,13 @@ const executeMiddleware = async (authorization) => {
 
 describe('authVerify', () => {
     let previousSecret;
-    let previousGetActiveUserById;
+    let previousFindActiveById;
 
     beforeEach(() => {
         previousSecret = process.env.JWT_SECRET;
         process.env.JWT_SECRET = JWT_SECRET;
-        previousGetActiveUserById = userRepository.getActiveUserById;
-        userRepository.getActiveUserById = async id => ({
+        previousFindActiveById = userRepository.findActiveById;
+        userRepository.findActiveById = async id => ({
             _id: id,
             nickname: 'usuario',
             state: true
@@ -61,7 +61,7 @@ describe('authVerify', () => {
     });
 
     afterEach(() => {
-        userRepository.getActiveUserById = previousGetActiveUserById;
+        userRepository.findActiveById = previousFindActiveById;
 
         if (previousSecret === undefined) {
             delete process.env.JWT_SECRET;
@@ -112,7 +112,7 @@ describe('authVerify', () => {
     });
 
     it('rechaza un JWT perteneciente a un usuario desactivado', async () => {
-        userRepository.getActiveUserById = async () => null;
+        userRepository.findActiveById = async () => null;
         const token = jwt.sign(
             { userId: 'user-1', nick: 'usuario' },
             JWT_SECRET

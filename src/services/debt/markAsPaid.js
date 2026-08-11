@@ -46,13 +46,13 @@ const createMarkAsPaid = ({
                     );
                 }
 
-                paidDebt = await debtRepository.updateDebt(
+                paidDebt = await debtRepository.updateById(
                     id,
                     {
                         paymentDate: Date.now(),
                         state: false
                     },
-                    session
+                    { session }
                 );
             });
         } finally {

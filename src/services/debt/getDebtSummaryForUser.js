@@ -1,7 +1,7 @@
 const createGetDebtSummaryForUser = ({ debtRepository }) => {
     const getDebtSummaryForUser = async userId => {
         const transactions = await debtRepository
-            .findDebtsAndCreditsByUserId(userId);
+            .findActiveByParticipant(userId);
         const summary = {
             debts: [],
             credits: []

@@ -1,56 +1,85 @@
-const Group = require('../models/group')
+const Group = require('../models/group');
+const {
+    applySession,
+    buildWriteOptions
+} = require('./repositoryOptions');
 
-const createGroup = async (groupData) => {
-    const newGroup = await Group.create(groupData)
-    return newGroup
-}
+const findAllActive = async (options = {}) => (
+    applySession(Group.find({ state: true }), options)
+);
 
-const deleteGroup = async (id) => {
-    const  delGroup = await Group.findByIdAndUpdate(id,{state : false}, { new: true })
-    return delGroup
-}
+const findAllActiveByUser = async (userId, options = {}) => (
+    applySession(
+        Group.find({ members: userId, state: true }),
+        options
+    )
+);
 
-const updateGroup = async (id,groupData) => {
-    const updateGroup = await Group.findByIdAndUpdate(id, groupData, { new: true, runValidators: true })
-    return updateGroup
-}
+const findById = async (id, options = {}) => (
+    applySession(Group.findById(id), options)
+);
 
-const getAllGroup = async () => {
-    const groups = await Group.find({ state: true })
-    return groups
-}
+const findActiveById = async (id, options = {}) => (
+    applySession(Group.findOne({ _id: id, state: true }), options)
+);
 
-const getGroupyId = async (id, session = null) => {
-    const group = await Group.findById(id).session(session)
-    return group
+const findByName = async (name, options = {}) => (
+    applySession(Group.findOne({ name }), options)
+);
 
-}
-const getAllGroupsByUser= async (id) => {
-    const groups = await Group.find({ members: id, state: true })
-    return groups
-}
-   
+const findByCode = async (code, options = {}) => (
+    applySession(Group.findOne({ code }), options)
+);
 
+const findActiveByCode = async (code, options = {}) => (
+    applySession(Group.findOne({ code, state: true }), options)
+);
 
-const getGroupByName = async (name) => {
-    const group = await Group.findOne({name});
+const create = async (groupData, options = {}) => {
+    if (!options.session) {
+        return Group.create(groupData);
+    }
+
+    const [group] = await Group.create([groupData], {
+        session: options.session
+    });
     return group;
+};
 
-}
+const updateById = async (id, groupData, options = {}) => (
+    Group.findByIdAndUpdate(
+        id,
+        groupData,
+        buildWriteOptions(options, { new: true, runValidators: true })
+    )
+);
 
-const getGroupByCode = async (code) => {
-    const group = await Group.findOne({code});
-    return group;
+const deactivateById = async (id, options = {}) => (
+    Group.findByIdAndUpdate(
+        id,
+        { state: false },
+        buildWriteOptions(options, { new: true })
+    )
+);
 
-}
+const addMemberById = async (groupId, userId, options = {}) => (
+    Group.findByIdAndUpdate(
+        groupId,
+        { $addToSet: { members: userId } },
+        buildWriteOptions(options, { new: true, runValidators: true })
+    )
+);
+
 module.exports = {
-    getAllGroup,
-    getGroupyId,
-    createGroup,
-    updateGroup,
-    deleteGroup,
-    getGroupByName,
-    getGroupByCode,
-    getAllGroupsByUser
-
-}
+    addMemberById,
+    create,
+    deactivateById,
+    findActiveByCode,
+    findActiveById,
+    findAllActive,
+    findAllActiveByUser,
+    findByCode,
+    findById,
+    findByName,
+    updateById
+};

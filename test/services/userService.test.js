@@ -27,9 +27,9 @@ describe('userService: autorización y campos permitidos', () => {
 
         await withRepositoryStubs(
             {
-                getUserByEmail: async () => null,
-                getUserByNickName: async () => null,
-                createUser: async data => {
+                findByEmail: async () => null,
+                findByNickname: async () => null,
+                create: async data => {
                     persistedData = data;
                     return data;
                 }
@@ -70,7 +70,7 @@ describe('userService: autorización y campos permitidos', () => {
         const expectedUser = { _id: 'user-1', name: 'Usuario' };
 
         await withRepositoryStubs(
-            { getUserById: async () => expectedUser },
+            { findActiveById: async () => expectedUser },
             async () => {
                 const user = await userService.getUserById('user-1', 'user-1');
                 assert.equal(user, expectedUser);
@@ -83,8 +83,8 @@ describe('userService: autorización y campos permitidos', () => {
 
         await withRepositoryStubs(
             {
-                getUserById: async () => ({ _id: 'user-1' }),
-                updateUser: async (id, data) => {
+                findActiveById: async () => ({ _id: 'user-1' }),
+                updateById: async (id, data) => {
                     persistedData = { id, data };
                     return persistedData;
                 }
@@ -116,12 +116,12 @@ describe('userService: autorización y campos permitidos', () => {
 
         await withRepositoryStubs(
             {
-                getUserById: async (id, receivedSession) => {
-                    assert.equal(receivedSession, session);
+                findActiveById: async (id, options) => {
+                    assert.deepEqual(options, { session });
                     return { _id: id };
                 },
-                updateUser: async (id, data, receivedSession) => {
-                    persistedUpdate = { id, data, session: receivedSession };
+                updateById: async (id, data, options) => {
+                    persistedUpdate = { id, data, options };
                     return persistedUpdate;
                 }
             },
@@ -137,7 +137,7 @@ describe('userService: autorización y campos permitidos', () => {
         assert.deepEqual(persistedUpdate, {
             id: 'user-1',
             data: { $inc: { owe: 20 } },
-            session
+            options: { session }
         });
     });
 });

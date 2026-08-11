@@ -14,11 +14,11 @@ const createGroupService = ({
     generateRandomCode
 }) => {
     const getAllGroups = async userId => (
-        groupRepository.getAllGroupsByUser(userId)
+        groupRepository.findAllActiveByUser(userId)
     );
 
     const getGroupById = async (id, userId) => {
-        const group = await groupRepository.getGroupyId(id);
+        const group = await groupRepository.findActiveById(id);
         if (!group) {
             throw createHttpError(
                 404,
@@ -39,7 +39,7 @@ const createGroupService = ({
     };
 
     const getGroupsForUser = async userId => {
-        const groups = await groupRepository.getAllGroupsByUser(userId);
+        const groups = await groupRepository.findAllActiveByUser(userId);
 
         if (!groups || groups.length === 0) {
             return {
@@ -61,7 +61,7 @@ const createGroupService = ({
             );
         }
 
-        const existingGroup = await groupRepository.getGroupByName(
+        const existingGroup = await groupRepository.findByName(
             groupData.name
         );
         if (existingGroup) {
@@ -73,7 +73,7 @@ const createGroupService = ({
         }
 
         let code = generateRandomCode();
-        const existingCode = await groupRepository.getGroupByCode(code);
+        const existingCode = await groupRepository.findByCode(code);
         while (existingCode) {
             code = generateRandomCode();
             throw createHttpError(
@@ -83,7 +83,7 @@ const createGroupService = ({
             );
         }
 
-        return groupRepository.createGroup({
+        return groupRepository.create({
             name: groupData.name,
             admin: userData.userId,
             code,
@@ -92,7 +92,7 @@ const createGroupService = ({
     };
 
     const updateGroup = async (id, groupData, authenticatedUserId) => {
-        const existingGroup = await groupRepository.getGroupyId(id);
+        const existingGroup = await groupRepository.findActiveById(id);
         if (!existingGroup) {
             throw createHttpError(
                 404,
@@ -117,11 +117,11 @@ const createGroupService = ({
             );
         }
 
-        return groupRepository.updateGroup(id, { name: groupData.name });
+        return groupRepository.updateById(id, { name: groupData.name });
     };
 
     const deleteGroup = async (id, authenticatedUserId) => {
-        const existingGroup = await groupRepository.getGroupyId(id);
+        const existingGroup = await groupRepository.findActiveById(id);
         if (!existingGroup) {
             throw createHttpError(
                 404,
@@ -138,11 +138,11 @@ const createGroupService = ({
             );
         }
 
-        return groupRepository.deleteGroup(id);
+        return groupRepository.deactivateById(id);
     };
 
     const addMemberToGroup = async (groupCode, userNick, requesterId) => {
-        const group = await groupRepository.getGroupByCode(groupCode);
+        const group = await groupRepository.findActiveByCode(groupCode);
         if (!group) {
             throw createHttpError(
                 404,
@@ -159,7 +159,7 @@ const createGroupService = ({
             );
         }
 
-        const user = await userRepository.getUserByNickName(userNick);
+        const user = await userRepository.findActiveByNickname(userNick);
         if (!user) {
             throw createHttpError(
                 404,
@@ -176,12 +176,14 @@ const createGroupService = ({
             );
         }
 
-        group.members.push(user._id);
-        await group.save();
+        const updatedGroup = await groupRepository.addMemberById(
+            group._id,
+            user._id
+        );
 
         return {
             message: 'Usuario agregado al grupo exitosamente',
-            group
+            group: updatedGroup
         };
     };
 

@@ -1,6 +1,6 @@
 const createGetAllDebts = ({ debtRepository }) => {
     const getAllDebts = async userId => (
-        debtRepository.getAllDebtsForUser(userId)
+        debtRepository.findActiveByDebtor(userId)
     );
 
     return getAllDebts;

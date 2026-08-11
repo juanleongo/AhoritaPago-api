@@ -1,78 +1,88 @@
-const User  = require('../models/user')
+const User = require('../models/user');
 const { escapeRegex } = require('../helpers/escapeRegex');
+const {
+    applySession,
+    buildWriteOptions
+} = require('./repositoryOptions');
 
-const getAllUsers = async () => {
-    const users = await User.find({ state: true })
-
-    return users
-}
-
-const getUserById = async (id, session = null) => {
-    const user = await User.findById(id).session(session)
-    return user
-
-}
-const getUserByToken = async (id) => {
-    const user = await User.findById(id)
-    return user
-
-}
-const getActiveUserById = async (id) => {
-    const user = await User.findOne({ _id: id, state: true })
-        .select('_id nickname state')
-    return user
-
-}
-const getUserByEmail = async (email) => {
-    const user = await  User.findOne( { email })
-    return user
-
-}
-const getUserByNickName = async (nickname) => {
-    const user = await  User.findOne( { nickname }).select('nickname name')
-    return user
-
-}
-
-
-const createUser = async (userData) => {
-    const newUser = await User.create(userData)
-    return newUser
-}
-
-const updateUser = async (id, updateData, session = null) => {
-return await User.findOneAndUpdate(
-    { _id: id },
-    updateData,
-    { new: true, runValidators: true, session }
+const findAllActive = async (options = {}) => (
+    applySession(User.find({ state: true }), options)
 );
-}
 
-const deleteUser = async (id) => {
-    const  delUser = await User.findByIdAndUpdate(id,{state : false}, { new: true })
+const findById = async (id, options = {}) => (
+    applySession(User.findById(id), options)
+);
 
-    return delUser
-}
+const findActiveById = async (id, options = {}) => (
+    applySession(
+        User.findOne({ _id: id, state: true }),
+        options
+    )
+);
 
-const findUsersByNicknameSearch = async (searchTerm) => {
+const findByEmail = async (email, options = {}) => (
+    applySession(User.findOne({ email }), options)
+);
 
+const findByNickname = async (nickname, options = {}) => (
+    applySession(
+        User.findOne({ nickname }).select('nickname name'),
+        options
+    )
+);
+
+const findActiveByNickname = async (nickname, options = {}) => (
+    applySession(
+        User.findOne({ nickname, state: true }).select('nickname name'),
+        options
+    )
+);
+
+const searchActiveByNickname = async (searchTerm, options = {}) => {
     const regex = new RegExp(escapeRegex(searchTerm), 'i');
 
-    const users = await User.find({ nickname: regex }).select('nickname name');
-    
-    return users;
+    return applySession(
+        User.find({ nickname: regex, state: true }).select('nickname name'),
+        options
+    );
 };
 
-module.exports = {
-    getAllUsers,
-    getUserById,
-    createUser,
-    updateUser,
-    deleteUser,
-    getUserByEmail,
-    getUserByNickName,
-    getUserByToken,
-    getActiveUserById,
-    findUsersByNicknameSearch
+const create = async (userData, options = {}) => {
+    if (!options.session) {
+        return User.create(userData);
+    }
 
-}
+    const [user] = await User.create([userData], {
+        session: options.session
+    });
+    return user;
+};
+
+const updateById = async (id, updateData, options = {}) => (
+    User.findByIdAndUpdate(
+        id,
+        updateData,
+        buildWriteOptions(options, { new: true, runValidators: true })
+    )
+);
+
+const deactivateById = async (id, options = {}) => (
+    User.findByIdAndUpdate(
+        id,
+        { state: false },
+        buildWriteOptions(options, { new: true })
+    )
+);
+
+module.exports = {
+    create,
+    deactivateById,
+    findActiveById,
+    findActiveByNickname,
+    findAllActive,
+    findByEmail,
+    findById,
+    findByNickname,
+    searchActiveByNickname,
+    updateById
+};
