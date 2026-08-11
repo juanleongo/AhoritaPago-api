@@ -43,11 +43,14 @@ transacciones utilizadas al crear, pagar o eliminar deudas.
 
 ## Instalación local
 
-Instala las dependencias:
+Instala exactamente las versiones registradas en `package-lock.json`:
 
 ```bash
-npm install
+npm ci
 ```
+
+Usa `npm install` únicamente cuando agregues, elimines o actualices una
+dependencia y conserva el cambio resultante de `package-lock.json`.
 
 Copia la plantilla de variables de entorno:
 
@@ -65,6 +68,20 @@ La API utiliza el puerto indicado en `PORT`.
 El puerto solo se abre después de establecer correctamente la conexión con
 MongoDB. Si la conexión falla, la aplicación informa el error y no acepta
 solicitudes HTTP.
+
+### Instalación de producción
+
+Las dependencias utilizadas solo durante el desarrollo se excluyen con:
+
+```bash
+npm ci --omit=dev
+npm start
+```
+
+`nodemon` pertenece a `devDependencies` y se usa exclusivamente mediante
+`npm run dev`. El servidor de producción se ejecuta directamente con Node.
+`package-lock.json` se mantiene versionado para que desarrollo, integración
+continua y producción resuelvan el mismo árbol de dependencias.
 
 ## Variables de entorno
 
