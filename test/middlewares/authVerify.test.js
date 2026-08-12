@@ -2,7 +2,9 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const userRepository = require('../../src/repositories/user');
-const { createAuthVerify } = require('../../src/middlewares/authVerify');
+const {
+    createAuthVerify
+} = require('../../src/middlewares/factories/createAuthVerify');
 const { errorHandler } = require('../../src/middlewares/errorHandler');
 
 const JWT_SECRET = 'test-secret';

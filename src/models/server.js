@@ -1,6 +1,9 @@
 const express = require('express');
 const { createConnection } = require('../db/config');
-const { errorHandler, notFoundHandler } = require('../middlewares');
+const {
+    errorHandler,
+    notFoundHandler
+} = require('../middlewares/errorHandler');
 const { createCompositionRoot } = require('../compositionRoot');
 const { createAppConfig } = require('../config/appConfig');
 class Server {

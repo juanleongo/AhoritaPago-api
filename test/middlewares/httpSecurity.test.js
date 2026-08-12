@@ -5,9 +5,13 @@ const { createHttpSecurityConfig } = require('../../src/config/httpSecurity');
 const {
     createHttpSecurity,
     isOriginAllowed
-} = require('../../src/middlewares/httpSecurity');
-const { createAuthRouter } = require('../../src/routes/auth');
-const { createUserRouter } = require('../../src/routes/user');
+} = require('../../src/middlewares/factories/createHttpSecurity');
+const {
+    createAuthRouter
+} = require('../../src/routes/factories/createAuthRouter');
+const {
+    createUserRouter
+} = require('../../src/routes/factories/createUserRouter');
 
 const withHttpApp = async (app, work) => {
     const listener = app.listen(0);

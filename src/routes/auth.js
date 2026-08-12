@@ -1,22 +1,8 @@
-const { Router } = require('express');
-const { allowOnlyFields, validateForms } = require('../middlewares');
+// Fachada de compatibilidad. El grafo principal importa la fábrica pura desde
+// routes/factories/createAuthRouter.js.
 const defaultAuthController = require('../controllers/auth');
 const { defaultHttpSecurity } = require('../middlewares/httpSecurity');
-const { loginValidators } = require('../validators/authValidators');
-
-const createAuthRouter = ({ authController, loginRateLimiter }) => {
-    const router = Router();
-    const loginMiddleware = [
-        loginRateLimiter,
-        allowOnlyFields(['email', 'password']),
-        ...loginValidators,
-        validateForms
-    ].filter(Boolean);
-
-    router.post('/login', loginMiddleware, authController.login);
-
-    return router;
-};
+const { createAuthRouter } = require('./factories/createAuthRouter');
 
 const router = createAuthRouter({
     authController: defaultAuthController,

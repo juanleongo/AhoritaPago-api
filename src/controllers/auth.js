@@ -1,17 +1,9 @@
+// Fachada de compatibilidad. El grafo principal importa la fábrica pura desde
+// controllers/factories/createAuthController.js.
 const authService = require('../services/authService');
-const { asyncHandler } = require('../middlewares/asyncHandler');
-const { loginDto } = require('../dtos/authDtos');
-
-const createAuthController = ({ authService }) => {
-    const login = asyncHandler(async (req, res) => {
-        const { email, password } = loginDto(req.validated.body);
-        const token = await authService.login(email, password);
-
-        res.status(200).json({ token });
-    });
-
-    return { login };
-};
+const {
+    createAuthController
+} = require('./factories/createAuthController');
 
 const defaultController = createAuthController({ authService });
 

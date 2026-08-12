@@ -1,6 +1,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { createUserController } = require('../../src/controllers/user');
+const {
+    createUserController
+} = require('../../src/controllers/factories/createUserController');
 
 describe('userController: búsqueda paginada', () => {
     it('propaga la query validada y conserva results en la respuesta', async () => {

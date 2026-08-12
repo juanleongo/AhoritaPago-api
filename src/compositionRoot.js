@@ -8,16 +8,36 @@ const { createUserService } = require('./services/factories/createUserService');
 const { createGroupService } = require('./services/factories/createGroupService');
 const { createAuthService } = require('./services/factories/createAuthService');
 const { createDebtService } = require('./services/debt/createDebtService');
-const { createAuthVerify } = require('./middlewares/authVerify');
-const { createUserController } = require('./controllers/user');
-const { createGroupController } = require('./controllers/group');
-const { createAuthController } = require('./controllers/auth');
-const { createDebtController } = require('./controllers/debt');
-const { createUserRouter } = require('./routes/user');
-const { createGroupRouter } = require('./routes/group');
-const { createAuthRouter } = require('./routes/auth');
-const { createDebtRouter } = require('./routes/debt');
-const { createHttpSecurity } = require('./middlewares/httpSecurity');
+const {
+    createAuthVerify
+} = require('./middlewares/factories/createAuthVerify');
+const {
+    createHttpSecurity
+} = require('./middlewares/factories/createHttpSecurity');
+const {
+    createUserController
+} = require('./controllers/factories/createUserController');
+const {
+    createGroupController
+} = require('./controllers/factories/createGroupController');
+const {
+    createAuthController
+} = require('./controllers/factories/createAuthController');
+const {
+    createDebtController
+} = require('./controllers/factories/createDebtController');
+const {
+    createUserRouter
+} = require('./routes/factories/createUserRouter');
+const {
+    createGroupRouter
+} = require('./routes/factories/createGroupRouter');
+const {
+    createAuthRouter
+} = require('./routes/factories/createAuthRouter');
+const {
+    createDebtRouter
+} = require('./routes/factories/createDebtRouter');
 const { createAppConfig } = require('./config/appConfig');
 const {
     createMongooseTransactionManager

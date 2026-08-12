@@ -1,9 +1,17 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const authRouter = require('../../src/routes/auth');
-const debtRouter = require('../../src/routes/debt');
-const groupRouter = require('../../src/routes/group');
-const userRouter = require('../../src/routes/user');
+const { createCompositionRoot } = require('../../src/compositionRoot');
+const { createTestAppConfig } = require('../fixtures/appConfig');
+
+const { routers } = createCompositionRoot({
+    infrastructure: { config: createTestAppConfig() }
+});
+const {
+    auth: authRouter,
+    debt: debtRouter,
+    group: groupRouter,
+    user: userRouter
+} = routers;
 
 const middlewareNamesFor = (router, method, path) => {
     const layer = router.stack.find(item => (

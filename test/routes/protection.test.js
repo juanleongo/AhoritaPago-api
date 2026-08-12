@@ -1,8 +1,16 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const userRouter = require('../../src/routes/user');
-const groupRouter = require('../../src/routes/group');
-const debtRouter = require('../../src/routes/debt');
+const { createCompositionRoot } = require('../../src/compositionRoot');
+const { createTestAppConfig } = require('../fixtures/appConfig');
+
+const { routers } = createCompositionRoot({
+    infrastructure: { config: createTestAppConfig() }
+});
+const {
+    debt: debtRouter,
+    group: groupRouter,
+    user: userRouter
+} = routers;
 
 const findMiddlewareIndex = (router, middlewareName) => (
     router.stack.findIndex(layer => layer.name === middlewareName)

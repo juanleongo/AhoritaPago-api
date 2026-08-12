@@ -279,8 +279,38 @@ El composition root construye e inyecta:
 
 Los servicios no reciben estas dependencias desde variables globales dentro de
 su lógica. Se construyen mediante fábricas ubicadas en
-`src/services/factories/` y `src/services/debt/`. Controladores y routers
-también exponen fábricas para recibir servicios y handlers ya construidos.
+`src/services/factories/` y `src/services/debt/`. El composition root importa
+las fábricas puras de controladores, routers y middleware desde:
+
+```text
+src/controllers/factories/
+src/routes/factories/
+src/middlewares/factories/
+```
+
+Importar esos módulos solo expone funciones de construcción: no carga
+servicios predeterminados, no crea routers y no genera un segundo grafo de
+dependencias. Las instancias se construyen únicamente al ejecutar
+`createCompositionRoot()`.
+
+### Fachadas de compatibilidad
+
+Los paths públicos anteriores se conservan temporalmente:
+
+```text
+src/controllers/{auth,debt,group,user}.js
+src/routes/{auth,debt,group,user}.js
+src/middlewares/{authVerify,httpSecurity}.js
+```
+
+Estos módulos son fachadas heredadas y sí construyen una instancia
+predeterminada cuando se importan explícitamente. La aplicación y sus pruebas
+funcionales ya no dependen de ellos; solo la prueba de compatibilidad los
+carga para garantizar que consumidores externos existentes no se rompan.
+
+El código nuevo debe importar una fábrica desde `factories/` o recibir la
+instancia desde el composition root. Las fachadas solo podrán eliminarse
+después de confirmar que ningún consumidor externo utiliza los paths antiguos.
 
 ### Contratos de repositorios
 
@@ -350,9 +380,9 @@ src/services/
     └── updateDebt.js              Actualización autorizada
 ```
 
-Los controladores continúan importando `debtservice.js`. La fachada conserva
-las mismas nueve funciones públicas y delega cada una al caso de uso
-correspondiente, evitando cambios en rutas o consumidores existentes.
+El composition root crea el servicio de deudas y lo inyecta en la fábrica pura
+del controlador. `debtservice.js` conserva las mismas nueve funciones públicas
+únicamente como fachada para consumidores heredados.
 
 ## Autenticación
 
@@ -822,6 +852,10 @@ Cobertura inicial:
 - Definición de índices compuestos para deudas y usuarios.
 - Compatibilidad de la fachada y separación de casos de uso de deudas.
 - Propagación de dependencias desde composition root hasta routers.
+- Carga del composition root sin controladores, routers o middleware
+  predeterminados ocultos.
+- Importación de fábricas de router sin construir instancias.
+- Compatibilidad temporal de las fachadas públicas anteriores.
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
 - Contratos, filtros activos y contexto transaccional de los repositorios.
 - Persistencia de integrantes encapsulada en el repositorio de grupos.
