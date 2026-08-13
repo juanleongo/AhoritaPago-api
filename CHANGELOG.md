@@ -2,6 +2,22 @@
 
 ## Sin publicar
 
+### Retiro gradual de la API legacy (REC-21)
+
+- Todos los endpoints `/api/*` sin versión anuncian `Deprecation`, un `Link`
+  dinámico hacia su sucesor v2 y `Sunset`.
+- La deprecación comienza el 13 de agosto de 2026 y el retiro predeterminado se
+  anuncia para el 1 de febrero de 2027 a las 00:00 UTC. Ambas fechas se pueden
+  ajustar mediante configuración validada.
+- Los usos legacy producen eventos `legacy_api_request` en logs con ruta,
+  método, sucesor, estado, origen y user-agent, sin almacenar tokens, body,
+  query, usuario autenticado ni dirección IP.
+- `LEGACY_API_ENABLED=false` deja de montar los endpoints antiguos y conserva
+  `/api/v2` operativo. `LEGACY_API_LOG_USAGE` permite controlar la medición.
+- Se documentaron los criterios de salida: migrar el frontend, identificar
+  consumidores, observar 30 días sin tráfico, apagar legacy, monitorear siete
+  días y eliminar sus adaptadores en una versión mayor.
+
 ### Contrato HTTP uniforme (REC-11)
 
 - Se agregó `/api/v2` con un envelope uniforme basado en `success`, `data`,
@@ -15,7 +31,7 @@
   `/api/*` permanece disponible durante la migración del frontend.
 - El servicio de grupos devuelve el grupo actualizado al agregar integrantes;
   los mensajes HTTP se generan en cada adaptador de controlador.
-- No se fijó una fecha de retiro para los endpoints sin versión.
+- El calendario de retiro se define ahora en REC-21.
 
 ### Saldos derivados (REC-10)
 
@@ -43,10 +59,9 @@
 - `GET /api/group` es ahora el listado canónico de los grupos del usuario.
 - `GET /api/group/mygroups` permanece temporalmente como alias deprecado y
   ejecuta exactamente el mismo controlador. Informa
-  `Deprecation: @1786492800` y
-  `Link: </api/group>; rel="successor-version"`.
-- No se ha fijado una fecha `Sunset`; el alias no debe eliminarse hasta
-  anunciarla y comprobar que el frontend ya usa la ruta canónica.
+  `Deprecation: @1786579200`,
+  `Link: </api/v2/group>; rel="successor-version"` y el `Sunset` definido por
+  REC-21.
 
 ## 2.0.0
 

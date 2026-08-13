@@ -106,6 +106,10 @@ continua y producción resuelvan el mismo árbol de dependencias.
 | `LOGIN_RATE_LIMIT_MAX` | Intentos fallidos de login permitidos por ventana. Por defecto: `15`. |
 | `REGISTRATION_RATE_LIMIT_WINDOW_MS` | Ventana del límite de registro. Por defecto: `3600000`. |
 | `REGISTRATION_RATE_LIMIT_MAX` | Registros permitidos por ventana. Por defecto: `10`. |
+| `LEGACY_API_ENABLED` | Monta temporalmente `/api/*`. Por defecto: `true`. Cambiar a `false` solo después de completar la migración. |
+| `LEGACY_API_LOG_USAGE` | Registra eventos estructurados de consumo legacy. Por defecto: `true`. |
+| `LEGACY_API_DEPRECATION_DATE` | Fecha ISO 8601 anunciada en `Deprecation`. Por defecto: `2026-08-13T00:00:00.000Z`. |
+| `LEGACY_API_SUNSET_DATE` | Fecha ISO 8601 de retiro anunciada en `Sunset`. Por defecto: `2027-02-01T00:00:00.000Z`. |
 
 No se debe versionar el archivo `.env` ni usar el valor de ejemplo de
 `JWT_SECRET` en un entorno real.
@@ -114,7 +118,8 @@ Los booleanos opcionales solo aceptan `true` o `false`. Los límites y ventanas
 deben ser enteros positivos, salvo `TRUST_PROXY_HOPS`, que también admite
 `0`. `JSON_BODY_LIMIT` acepta tamaños positivos en `b`, `kb` o `mb`.
 `CORS_ALLOWED_ORIGINS` acepta orígenes HTTP/HTTPS separados por coma, sin
-rutas, credenciales, query ni fragmentos.
+rutas, credenciales, query ni fragmentos. La fecha de `Sunset` debe ser
+posterior a la fecha de deprecación.
 
 ### Validación al iniciar
 
@@ -733,9 +738,35 @@ Al migrar el frontend debe leerse el recurso desde `response.data.data` si la
 librería HTTP conserva la respuesta completa, o desde `body.data` al trabajar
 directamente con `fetch`. Los conteos y la paginación pasan a `body.meta`.
 
-No se ha fijado una fecha para retirar `/api/*`. Su eliminación requiere
-comprobar primero que el frontend ya no lo consume y se hará como un cambio
-incompatible independiente.
+Los endpoints sin versión están deprecados desde el **13 de agosto de 2026** y
+su `Sunset` está programado para el **1 de febrero de 2027 a las 00:00 UTC**.
+Mientras permanezcan activos agregan:
+
+```http
+Deprecation: @1786579200
+Link: </api/v2/...>; rel="successor-version"
+Sunset: Mon, 01 Feb 2027 00:00:00 GMT
+```
+
+Cada respuesta legacy genera en los logs de Render un evento JSON con
+`event: "legacy_api_request"`, método, ruta, sucesor, estado HTTP, origen y
+user-agent. No registra JWT, body, query, ID de usuario ni dirección IP.
+
+### Criterios para retirar legacy
+
+1. Desplegar el frontend usando exclusivamente `/api/v2`.
+2. Buscar `legacy_api_request` en los logs y clasificar los consumidores por
+   ruta, origen y user-agent.
+3. Mantener al menos 30 días consecutivos sin tráfico legacy de consumidores
+   conocidos antes del `Sunset`.
+4. Comunicar el `Sunset` a cualquier consumidor externo identificado.
+5. Configurar `LEGACY_API_ENABLED=false` y verificar que v2 continúa operando.
+6. Monitorear errores durante siete días y después eliminar físicamente routers
+   y controladores legacy en una versión mayor.
+
+Si todavía existe tráfico legítimo cerca de la fecha, se puede mover
+`LEGACY_API_SUNSET_DATE` a una fecha posterior y volver a desplegar. No debe
+desactivarse legacy silenciosamente antes de anunciar el nuevo plazo.
 
 ## Endpoints legacy
 
@@ -812,25 +843,22 @@ como máximo `50` resultados.
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/group` | Lista los grupos del usuario. |
-| `GET` | `/api/group/mygroups` | Alias deprecado; usar `/api/group`. |
+| `GET` | `/api/group/mygroups` | Alias legacy deprecado; usar `/api/v2/group`. |
 | `GET` | `/api/group/:id` | Consulta un grupo al que pertenece. |
 | `POST` | `/api/group` | Crea un grupo. |
 | `POST` | `/api/group/addMember` | Agrega una persona; puede hacerlo cualquier integrante. |
 | `PUT` | `/api/group/:id` | Modifica el nombre; solo administrador. |
 | `DELETE` | `/api/group/:id` | Desactiva el grupo; solo administrador. |
 
-`GET /api/group` es el contrato canónico. El alias `/api/group/mygroups`
-permanece operativo temporalmente y devuelve el mismo JSON mediante el mismo
-caso de uso, pero agrega estos encabezados:
+`GET /api/group/mygroups` permanece operativo temporalmente y devuelve el mismo
+JSON que `GET /api/group`. Como toda la API legacy, anuncia directamente el
+sucesor v2:
 
 ```http
-Deprecation: @1786492800
-Link: </api/group>; rel="successor-version"
+Deprecation: @1786579200
+Link: </api/v2/group>; rel="successor-version"
+Sunset: Mon, 01 Feb 2027 00:00:00 GMT
 ```
-
-No se publica todavía un encabezado `Sunset`; su retiro deberá programarse y
-comunicarse en una actualización posterior. El frontend debe migrar a la ruta
-canónica antes de que se anuncie su retiro.
 
 Crear grupo:
 
@@ -1037,6 +1065,9 @@ Cobertura inicial:
 - Montaje simultáneo de endpoints legacy y `/api/v2` sobre los mismos servicios.
 - Búsqueda exacta de nickname mediante un parámetro de ruta y sin body GET.
 - Ausencia de `_id`, `__v` y `password` en los recursos v2.
+- Headers dinámicos de deprecación y `Sunset` en toda la API legacy.
+- Registro estructurado y sin credenciales del consumo de `/api/*`.
+- Desactivación configurable de legacy sin afectar el montaje de v2.
 - Bloqueo transaccional de la desactivación cuando existen deudas activas.
 - Encabezados de Helmet, CORS local y límite de cuerpos JSON.
 - Rate limiting deshabilitado por defecto y contratos `429` de los tres

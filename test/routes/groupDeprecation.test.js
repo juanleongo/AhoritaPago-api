@@ -4,6 +4,8 @@ const express = require('express');
 const {
     createGroupRouter
 } = require('../../src/routes/factories/createGroupRouter');
+const { createCompositionRoot } = require('../../src/compositionRoot');
+const { createTestAppConfig } = require('../fixtures/appConfig');
 
 const withHttpApp = async (app, work) => {
     const listener = app.listen(0);
@@ -67,7 +69,10 @@ describe('deprecación del listado duplicado de grupos', () => {
             groupController: createController(calls)
         });
         const app = express();
-        app.use('/api/group', router);
+        const root = createCompositionRoot({
+            infrastructure: { config: createTestAppConfig() }
+        });
+        app.use('/api/group', root.middleware.legacyApi.group, router);
 
         await withHttpApp(app, async baseUrl => {
             const canonicalResponse = await fetch(`${baseUrl}/api/group`);
@@ -83,17 +88,26 @@ describe('deprecación del listado duplicado de grupos', () => {
             );
             assert.equal(
                 canonicalResponse.headers.get('deprecation'),
-                null
+                `@${Math.floor(Date.parse(
+                    '2026-08-13T00:00:00.000Z'
+                ) / 1000)}`
             );
             assert.equal(
                 deprecatedResponse.headers.get('deprecation'),
-                '@1786492800'
+                canonicalResponse.headers.get('deprecation')
             );
             assert.equal(
                 deprecatedResponse.headers.get('link'),
-                '</api/group>; rel="successor-version"'
+                '</api/v2/group>; rel="successor-version"'
             );
-            assert.equal(deprecatedResponse.headers.get('sunset'), null);
+            assert.equal(
+                canonicalResponse.headers.get('link'),
+                '</api/v2/group>; rel="successor-version"'
+            );
+            assert.equal(
+                deprecatedResponse.headers.get('sunset'),
+                'Mon, 01 Feb 2027 00:00:00 GMT'
+            );
         });
 
         assert.deepEqual(calls, ['user-1', 'user-1']);

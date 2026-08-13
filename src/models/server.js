@@ -28,6 +28,10 @@ class Server {
         this.compositionRoot.infrastructure.httpSecurityConfig
         || this.config.httpSecurity
        )
+       this.apiLifecycleConfig = (
+        this.compositionRoot.infrastructure.apiLifecycleConfig
+        || this.config.apiLifecycle
+       )
        this.paths = {
         auth:       '/api/auth',
         group:       '/api/group',
@@ -90,10 +94,30 @@ class Server {
         this.app.use(this.paths.userV2, this.compositionRoot.routers.v2.user)
         this.app.use(this.paths.authV2, this.compositionRoot.routers.v2.auth)
         this.app.use(this.paths.paymentV2, this.compositionRoot.routers.v2.debt)
-        this.app.use(this.paths.group, this.compositionRoot.routers.group)
-        this.app.use(this.paths.user, this.compositionRoot.routers.user)
-        this.app.use(this.paths.auth, this.compositionRoot.routers.auth)
-        this.app.use(this.paths.payment, this.compositionRoot.routers.debt)
+        if (this.apiLifecycleConfig.legacyApiEnabled) {
+            const legacyApi = this.compositionRoot.middleware.legacyApi
+
+            this.app.use(
+                this.paths.group,
+                legacyApi.group,
+                this.compositionRoot.routers.group
+            )
+            this.app.use(
+                this.paths.user,
+                legacyApi.user,
+                this.compositionRoot.routers.user
+            )
+            this.app.use(
+                this.paths.auth,
+                legacyApi.auth,
+                this.compositionRoot.routers.auth
+            )
+            this.app.use(
+                this.paths.payment,
+                legacyApi.debt,
+                this.compositionRoot.routers.debt
+            )
+        }
         
     }
 

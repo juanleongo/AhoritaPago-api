@@ -226,5 +226,55 @@ test('expone autenticación v2 sin retirar la ruta legacy', async () => {
             success: true,
             data: { token: 'token-v2' }
         });
+        assert.equal(
+            legacyResponse.headers.get('link'),
+            '</api/v2/auth/login>; rel="successor-version"'
+        );
+        assert.equal(
+            legacyResponse.headers.get('sunset'),
+            'Mon, 01 Feb 2027 00:00:00 GMT'
+        );
+        assert.equal(v2Response.headers.get('deprecation'), null);
+        assert.equal(v2Response.headers.get('link'), null);
+        assert.equal(v2Response.headers.get('sunset'), null);
+    });
+});
+
+test('puede dejar de montar legacy sin afectar v2', async () => {
+    const config = createTestAppConfig({
+        LEGACY_API_ENABLED: 'false'
+    });
+    const compositionRoot = createCompositionRoot({
+        infrastructure: { config },
+        services: {
+            auth: {
+                async login() {
+                    return 'token-v2';
+                }
+            }
+        }
+    });
+    const server = new Server({ compositionRoot });
+
+    assert.equal(compositionRoot.controllers.user, undefined);
+    assert.equal(compositionRoot.routers.user, undefined);
+    assert.equal(compositionRoot.middleware.legacyApi, null);
+
+    await withHttpServer(server, async baseUrl => {
+        const request = path => fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'user@example.com',
+                password: 'password'
+            })
+        });
+        const legacyResponse = await request('/api/auth/login');
+        const v2Response = await request('/api/v2/auth/login');
+
+        assert.equal(legacyResponse.status, 404);
+        assert.equal((await legacyResponse.json()).error.code, 'ROUTE_NOT_FOUND');
+        assert.equal(v2Response.status, 200);
+        assert.equal((await v2Response.json()).data.token, 'token-v2');
     });
 });

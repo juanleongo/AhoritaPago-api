@@ -4,19 +4,11 @@ const {
 } = require('../../middlewares/allowOnlyFields');
 const { validateForms } = require('../../middlewares/validate-forms');
 const {
-    createDeprecateEndpoint
-} = require('../../middlewares/deprecateEndpoint');
-const {
     addGroupMemberValidators,
     createGroupValidators,
     groupIdValidators,
     updateGroupValidators
 } = require('../../validators/groupValidators');
-
-const deprecateMyGroups = createDeprecateEndpoint({
-    deprecationDate: '2026-08-12T00:00:00Z',
-    successorPath: '/api/group'
-});
 
 const createGroupRouter = ({
     authVerify,
@@ -30,7 +22,6 @@ const createGroupRouter = ({
     if (includeDeprecatedAliases) {
         router.get(
             '/mygroups',
-            deprecateMyGroups,
             groupController.getGroupsForUser
         );
     }
