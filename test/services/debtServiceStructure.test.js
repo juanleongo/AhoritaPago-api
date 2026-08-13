@@ -1,6 +1,5 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const debtService = require('../../src/services/debtservice');
 const { createDebtService } = require(
     '../../src/services/debt/createDebtService'
 );
@@ -21,7 +20,14 @@ const { createMarkAsPaid } = require('../../src/services/debt/markAsPaid');
 const { createUpdateDebt } = require('../../src/services/debt/updateDebt');
 
 describe('estructura modular del servicio de deudas', () => {
-    it('mantiene exactamente la API pública anterior', () => {
+    it('mantiene exactamente la API pública del servicio construido', () => {
+        const debtService = createDebtService({
+            debtRepository: {},
+            groupRepository: {},
+            transactionManager: {},
+            userService: {}
+        });
+
         assert.deepEqual(Object.keys(debtService).sort(), [
             'createDebt',
             'deleteDebt',

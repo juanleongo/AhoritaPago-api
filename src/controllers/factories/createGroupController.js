@@ -6,8 +6,8 @@ const {
 } = require('../../dtos/groupDtos');
 
 const createGroupController = ({ groupService }) => {
-    const getAllGroups = asyncHandler(async (req, res) => {
-        const groups = await groupService.getAllGroups(req.user.userId);
+    const getGroupsForUser = asyncHandler(async (req, res) => {
+        const groups = await groupService.getGroupsForUser(req.user.userId);
         res.status(200).json(groups);
     });
 
@@ -18,11 +18,6 @@ const createGroupController = ({ groupService }) => {
         );
 
         res.status(200).json(group);
-    });
-
-    const getUserGroups = asyncHandler(async (req, res) => {
-        const result = await groupService.getGroupsForUser(req.user.userId);
-        res.status(200).json(result.data);
     });
 
     const createGroup = asyncHandler(async (req, res) => {
@@ -68,9 +63,8 @@ const createGroupController = ({ groupService }) => {
         addMember,
         createGroup,
         deleteGroup,
-        getAllGroups,
         getGroupById,
-        getUserGroups,
+        getGroupsForUser,
         updateGroup
     };
 };

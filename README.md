@@ -4,6 +4,8 @@ API REST para gestionar deudas entre amigos, familiares o integrantes de un
 grupo. Permite registrar usuarios, crear grupos, distribuir deudas, consultar
 saldos, marcar pagos y revisar el historial de obligaciones activas y pagadas.
 
+Versión actual: **2.0.0**.
+
 ## Funcionalidades
 
 - Registro e inicio de sesión con JWT.
@@ -293,24 +295,24 @@ servicios predeterminados, no crea routers y no genera un segundo grafo de
 dependencias. Las instancias se construyen únicamente al ejecutar
 `createCompositionRoot()`.
 
-### Fachadas de compatibilidad
+### API interna oficial desde 2.0.0
 
-Los paths públicos anteriores se conservan temporalmente:
+La versión 2.0.0 retiró las fachadas que construían instancias predeterminadas.
+Los módulos oficiales son `src/compositionRoot.js` y las fábricas ubicadas en
+los directorios `factories/`. Ya no son válidos imports como:
 
-```text
-src/controllers/{auth,debt,group,user}.js
-src/routes/{auth,debt,group,user}.js
-src/middlewares/{authVerify,httpSecurity}.js
+```js
+require('./src/controllers/user');
+require('./src/routes/user');
+require('./src/services/userService');
+require('./src/middlewares/authVerify');
 ```
 
-Estos módulos son fachadas heredadas y sí construyen una instancia
-predeterminada cuando se importan explícitamente. La aplicación y sus pruebas
-funcionales ya no dependen de ellos; solo la prueba de compatibilidad los
-carga para garantizar que consumidores externos existentes no se rompan.
-
-El código nuevo debe importar una fábrica desde `factories/` o recibir la
-instancia desde el composition root. Las fachadas solo podrán eliminarse
-después de confirmar que ningún consumidor externo utiliza los paths antiguos.
+Un consumidor que necesite construir una pieza aislada debe importar su
+fábrica explícita; la aplicación completa debe obtenerse mediante
+`createCompositionRoot()`. Este es un cambio incompatible para imports
+internos directos, pero no modifica las rutas ni los contratos HTTP de la API.
+La guía de migración completa está en `CHANGELOG.md`.
 
 ### Contratos de repositorios
 
@@ -355,9 +357,8 @@ un repositorio desde el composition root sin que el caso de uso conozca los
 detalles de MongoDB.
 
 `Server` acepta opcionalmente `compositionRoot`, `connection` y `port`, lo que
-permite probar su arranque sin modificar `require.cache`. Los módulos públicos
-anteriores se conservan como fachadas de compatibilidad para consumidores que
-todavía los importen directamente.
+permite probar su arranque sin modificar `require.cache`. No existen módulos
+alternativos que construyan controladores, routers o servicios predeterminados.
 
 ### Casos de uso de deudas
 
@@ -365,9 +366,8 @@ El dominio de deudas está dividido por operación para que cada módulo tenga
 una única razón de cambio:
 
 ```text
-src/services/
-├── debtservice.js                 Fachada pública compatible
-└── debt/
+src/services/debt/
+    ├── createDebtService.js       Ensamblaje de los casos de uso
     ├── debtAccess.js              Identidad, participación y búsqueda común
     ├── createDebt.js              Creación transaccional
     ├── deleteDebt.js              Eliminación y reversión de saldos
@@ -381,8 +381,8 @@ src/services/
 ```
 
 El composition root crea el servicio de deudas y lo inyecta en la fábrica pura
-del controlador. `debtservice.js` conserva las mismas nueve funciones públicas
-únicamente como fachada para consumidores heredados.
+del controlador. No existe una instancia predeterminada construida al importar
+el módulo.
 
 ## Autenticación
 
@@ -663,12 +663,25 @@ como máximo `50` resultados.
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/group` | Lista los grupos del usuario. |
-| `GET` | `/api/group/mygroups` | Lista los grupos del usuario. |
+| `GET` | `/api/group/mygroups` | Alias deprecado; usar `/api/group`. |
 | `GET` | `/api/group/:id` | Consulta un grupo al que pertenece. |
 | `POST` | `/api/group` | Crea un grupo. |
 | `POST` | `/api/group/addMember` | Agrega una persona; puede hacerlo cualquier integrante. |
 | `PUT` | `/api/group/:id` | Modifica el nombre; solo administrador. |
 | `DELETE` | `/api/group/:id` | Desactiva el grupo; solo administrador. |
+
+`GET /api/group` es el contrato canónico. El alias `/api/group/mygroups`
+permanece operativo temporalmente y devuelve el mismo JSON mediante el mismo
+caso de uso, pero agrega estos encabezados:
+
+```http
+Deprecation: @1786492800
+Link: </api/group>; rel="successor-version"
+```
+
+No se publica todavía un encabezado `Sunset`; su retiro deberá programarse y
+comunicarse en una actualización posterior. El frontend debe migrar a la ruta
+canónica antes de que se anuncie su retiro.
 
 Crear grupo:
 
@@ -850,12 +863,14 @@ Cobertura inicial:
 - Paginación independiente, conteos totales y ordenamiento en MongoDB.
 - Paginación y orden estable de búsquedas parciales por nickname.
 - Definición de índices compuestos para deudas y usuarios.
-- Compatibilidad de la fachada y separación de casos de uso de deudas.
+- Separación y superficie pública del servicio construido de deudas.
 - Propagación de dependencias desde composition root hasta routers.
 - Carga del composition root sin controladores, routers o middleware
   predeterminados ocultos.
 - Importación de fábricas de router sin construir instancias.
-- Compatibilidad temporal de las fachadas públicas anteriores.
+- Ausencia física de las fachadas retiradas en la versión 2.0.0.
+- Ausencia de archivos `index.js` vacíos y métodos de listado sin ruta.
+- Ruta canónica de grupos y deprecación compatible de `/api/group/mygroups`.
 - Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
 - Contratos, filtros activos y contexto transaccional de los repositorios.
 - Persistencia de integrantes encapsulada en el repositorio de grupos.

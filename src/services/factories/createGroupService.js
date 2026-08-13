@@ -27,7 +27,7 @@ const createGroupService = ({
     userRepository,
     generateRandomCode
 }) => {
-    const getAllGroups = async userId => (
+    const getGroupsForUser = async userId => (
         groupRepository.findAllActiveByUser(userId)
     );
 
@@ -50,20 +50,6 @@ const createGroupService = ({
         }
 
         return group;
-    };
-
-    const getGroupsForUser = async userId => {
-        const groups = await groupRepository.findAllActiveByUser(userId);
-
-        if (!groups || groups.length === 0) {
-            return {
-                success: true,
-                data: [],
-                message: 'El usuario no pertenece a ningún grupo.'
-            };
-        }
-
-        return { success: true, data: groups };
     };
 
     const createGroup = async (groupData, userData) => {
@@ -208,7 +194,6 @@ const createGroupService = ({
         addMemberToGroup,
         createGroup,
         deleteGroup,
-        getAllGroups,
         getGroupById,
         getGroupsForUser,
         updateGroup

@@ -1,50 +1,45 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
+const { existsSync } = require('node:fs');
 const path = require('node:path');
+
+const projectRoot = path.resolve(__dirname, '../..');
 
 const runIsolatedCheck = source => execFileSync(
     process.execPath,
     ['-e', source],
     {
-        cwd: path.resolve(__dirname, '../..'),
+        cwd: projectRoot,
         encoding: 'utf8'
     }
 );
 
-const legacyModules = [
-    './src/controllers/auth',
-    './src/controllers/debt',
-    './src/controllers/group',
-    './src/controllers/user',
-    './src/routes/auth',
-    './src/routes/debt',
-    './src/routes/group',
-    './src/routes/user',
-    './src/middlewares/authVerify',
-    './src/middlewares/httpSecurity',
-    './src/middlewares/index',
-    './src/services/authService',
-    './src/services/debtservice',
-    './src/services/groupService',
-    './src/services/userService'
+const removedFacades = [
+    'src/controllers/auth.js',
+    'src/controllers/debt.js',
+    'src/controllers/group.js',
+    'src/controllers/user.js',
+    'src/routes/auth.js',
+    'src/routes/debt.js',
+    'src/routes/group.js',
+    'src/routes/user.js',
+    'src/middlewares/authVerify.js',
+    'src/middlewares/httpSecurity.js',
+    'src/middlewares/index.js',
+    'src/services/authService.js',
+    'src/services/debtservice.js',
+    'src/services/groupService.js',
+    'src/services/userService.js'
 ];
 
 describe('fábricas puras y carga de módulos', () => {
-    it('carga el composition root sin cargar fachadas heredadas', () => {
-        const source = `
-            require('./src/compositionRoot');
-            const legacyModules = ${JSON.stringify(legacyModules)};
-            const loaded = legacyModules.filter(modulePath => (
-                require.cache[require.resolve(modulePath)]
-            ));
-            process.stdout.write(JSON.stringify(loaded));
-        `;
+    it('retira físicamente todas las fachadas heredadas', () => {
+        const existingFacades = removedFacades.filter(relativePath => (
+            existsSync(path.join(projectRoot, relativePath))
+        ));
 
-        assert.deepEqual(
-            JSON.parse(runIsolatedCheck(source)),
-            []
-        );
+        assert.deepEqual(existingFacades, []);
     });
 
     it('importa fábricas de router sin construir routers', () => {
@@ -69,33 +64,19 @@ describe('fábricas puras y carga de módulos', () => {
         assert.equal(runIsolatedCheck(source), '0');
     });
 
-    it('las fábricas puras no cargan servicios predeterminados', () => {
-        const pureFactories = [
-            './src/controllers/factories/createAuthController',
-            './src/controllers/factories/createDebtController',
-            './src/controllers/factories/createGroupController',
-            './src/controllers/factories/createUserController',
-            './src/middlewares/factories/createAuthVerify',
-            './src/middlewares/factories/createHttpSecurity'
-        ];
-        const serviceFacades = [
-            './src/services/authService',
-            './src/services/debtservice',
-            './src/services/groupService',
-            './src/services/userService'
-        ];
+    it('carga el composition root sin construir la aplicación', () => {
         const source = `
-            ${JSON.stringify(pureFactories)}.forEach(require);
-            const serviceFacades = ${JSON.stringify(serviceFacades)};
-            const loaded = serviceFacades.filter(modulePath => (
-                require.cache[require.resolve(modulePath)]
-            ));
-            process.stdout.write(JSON.stringify(loaded));
+            const express = require('express');
+            const originalRouter = express.Router;
+            let constructions = 0;
+            express.Router = (...args) => {
+                constructions += 1;
+                return originalRouter(...args);
+            };
+            require('./src/compositionRoot');
+            process.stdout.write(String(constructions));
         `;
 
-        assert.deepEqual(
-            JSON.parse(runIsolatedCheck(source)),
-            []
-        );
+        assert.equal(runIsolatedCheck(source), '0');
     });
 });

@@ -2,7 +2,16 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const groupRepository = require('../../src/repositories/group');
 const userRepository = require('../../src/repositories/user');
-const groupService = require('../../src/services/groupService');
+const { generateRandomCode } = require('../../src/helpers/codeGenerator');
+const {
+    createGroupService
+} = require('../../src/services/factories/createGroupService');
+
+const groupService = createGroupService({
+    generateRandomCode,
+    groupRepository,
+    userRepository
+});
 
 const withStubs = async (target, stubs, work) => {
     const originals = {};

@@ -53,6 +53,7 @@ const createLimiter = ({ code, max, message, windowMs, ...options }) => (
 const createHttpSecurity = config => {
     const corsMiddleware = cors({
         allowedHeaders: ['Authorization', 'Content-Type'],
+        exposedHeaders: ['Deprecation', 'Link', 'Sunset'],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         origin(origin, callback) {
             callback(null, isOriginAllowed(origin, config));

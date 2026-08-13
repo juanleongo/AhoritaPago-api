@@ -4,10 +4,6 @@ const {
     buildWriteOptions
 } = require('./repositoryOptions');
 
-const findAllActive = async (options = {}) => (
-    applyTransaction(Group.find({ state: true }), options)
-);
-
 const findAllActiveByUser = async (userId, options = {}) => (
     applyTransaction(
         Group.find({ members: userId, state: true }),
@@ -72,7 +68,6 @@ module.exports = {
     deactivateById,
     findActiveByCode,
     findActiveById,
-    findAllActive,
     findAllActiveByUser,
     findByCode,
     findById,

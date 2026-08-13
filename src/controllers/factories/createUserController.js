@@ -7,11 +7,6 @@ const {
 const { searchPaginationDto } = require('../../dtos/paginationDtos');
 
 const createUserController = ({ userService }) => {
-    const getAllUsers = asyncHandler(async (req, res) => {
-        const users = await userService.getAllUsers();
-        res.status(200).json(users);
-    });
-
     const getUserById = asyncHandler(async (req, res) => {
         const user = await userService.getUserById(
             req.validated.params.id,
@@ -74,7 +69,6 @@ const createUserController = ({ userService }) => {
     return {
         createUser,
         deleteUser,
-        getAllUsers,
         getByNickname,
         getUserById,
         getUserByToken,

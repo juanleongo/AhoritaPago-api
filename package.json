@@ -1,6 +1,6 @@
 {
   "name": "ahoritapago",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "app para la gestion de deudas con amigos y familiares",
   "main": "index.js",
   "scripts": {

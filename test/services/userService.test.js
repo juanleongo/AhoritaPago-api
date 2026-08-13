@@ -1,8 +1,20 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const bcryptjs = require('bcryptjs');
+const debtRepository = require('../../src/repositories/debt');
 const userRepository = require('../../src/repositories/user');
-const userService = require('../../src/services/userService');
+const {
+    createUserService
+} = require('../../src/services/factories/createUserService');
+
+const userService = createUserService({
+    debtRepository,
+    passwordHasher: bcryptjs,
+    transactionManager: {
+        runInTransaction: work => work({ id: 'transaction-1' })
+    },
+    userRepository
+});
 
 const withRepositoryStubs = async (stubs, work) => {
     const originals = {};

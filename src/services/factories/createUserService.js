@@ -12,8 +12,6 @@ const createUserService = ({
     transactionManager,
     userRepository
 }) => {
-    const getAllUsers = async () => userRepository.findAllActive();
-
     const getUserById = async (id, authenticatedUserId) => {
         if (!isSameUser(id, authenticatedUserId)) {
             throw createHttpError(
@@ -245,7 +243,6 @@ const createUserService = ({
     return {
         createUser,
         deleteUser,
-        getAllUsers,
         getByNickname,
         getUserById,
         getUserByToken,

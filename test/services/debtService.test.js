@@ -2,11 +2,22 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const debtRepository = require('../../src/repositories/debt');
 const groupRepository = require('../../src/repositories/group');
-const userService = require('../../src/services/userService');
-const debtService = require('../../src/services/debtservice');
 const {
     createDebtService
 } = require('../../src/services/debt/createDebtService');
+
+const userService = {
+    async incrementUserBalances() {}
+};
+const defaultTransactionManager = {
+    runInTransaction: work => work({ id: 'default-transaction' })
+};
+const debtService = createDebtService({
+    debtRepository,
+    groupRepository,
+    transactionManager: defaultTransactionManager,
+    userService
+});
 
 const withStubs = async (target, stubs, work) => {
     const originals = {};

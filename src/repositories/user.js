@@ -11,10 +11,6 @@ const activeNicknameFilter = searchTerm => ({
     state: true
 });
 
-const findAllActive = async (options = {}) => (
-    applyTransaction(User.find({ state: true }), options)
-);
-
 const findById = async (id, options = {}) => (
     applyTransaction(User.findById(id), options)
 );
@@ -99,7 +95,6 @@ module.exports = {
     deactivateById,
     findActiveById,
     findActiveByNickname,
-    findAllActive,
     findByEmail,
     findById,
     findByNickname,

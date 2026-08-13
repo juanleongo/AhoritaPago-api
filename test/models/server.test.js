@@ -124,6 +124,10 @@ test('activa encabezados defensivos y CORS para el frontend local', async () => 
             response.headers.get('access-control-allow-origin'),
             'http://localhost:5173'
         );
+        assert.equal(
+            response.headers.get('access-control-expose-headers'),
+            'Deprecation,Link,Sunset'
+        );
     });
 });
 
