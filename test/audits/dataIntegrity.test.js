@@ -2,6 +2,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
     auditDataIntegrity,
+    buildActiveBalancesPipeline,
     buildDebtIntegrityPipeline,
     findLegacyUniqueGroupNameIndexes
 } = require('../../src/audits/dataIntegrity');
@@ -13,11 +14,21 @@ describe('auditoría de integridad de datos', () => {
         [
             'CREDITOR_REQUIRED',
             'DEBTOR_LIST_REQUIRED',
+            'DEBTOR_CARDINALITY_INVALID',
             'DEBTOR_ITEM_INVALID',
             'DEBTOR_DUPLICATED',
             'CREDITOR_IS_DEBTOR',
             'VALUE_NOT_POSITIVE'
         ].forEach(issue => assert.match(pipeline, new RegExp(issue)));
+    });
+
+    it('calcula ambos lados del saldo desde deudas activas', () => {
+        const pipeline = JSON.stringify(buildActiveBalancesPipeline());
+
+        assert.match(pipeline, /\"state\":true/);
+        assert.match(pipeline, /\"owe\"/);
+        assert.match(pipeline, /\"owes\"/);
+        assert.match(pipeline, /\$group/);
     });
 
     it('detecta únicamente índices globales únicos sobre name', () => {
@@ -38,7 +49,7 @@ describe('auditoría de integridad de datos', () => {
     });
 
     it('genera un reporte usando solo consultas de lectura', async () => {
-        let receivedPipeline;
+        const receivedPipelines = [];
         const invalidDebts = [{
             _id: 'debt-1',
             issues: ['VALUE_NOT_POSITIVE']
@@ -46,8 +57,10 @@ describe('auditoría de integridad de datos', () => {
         const report = await auditDataIntegrity({
             DebtModel: {
                 async aggregate(pipeline) {
-                    receivedPipeline = pipeline;
-                    return invalidDebts;
+                    receivedPipelines.push(pipeline);
+                    return receivedPipelines.length === 1
+                        ? invalidDebts
+                        : [{ userId: 'user-1', owe: 25, owes: 50 }];
                 }
             },
             GroupModel: {
@@ -62,13 +75,42 @@ describe('auditoría de integridad de datos', () => {
                         ];
                     }
                 }
+            },
+            UserModel: {
+                collection: {
+                    find() {
+                        return {
+                            async toArray() {
+                                return [{
+                                    _id: 'user-1',
+                                    owe: 10,
+                                    owes: 50
+                                }];
+                            }
+                        };
+                    }
+                }
             }
         });
 
-        assert.deepEqual(receivedPipeline, buildDebtIntegrityPipeline());
+        assert.deepEqual(
+            receivedPipelines[0],
+            buildDebtIntegrityPipeline()
+        );
+        assert.deepEqual(
+            receivedPipelines[1],
+            buildActiveBalancesPipeline()
+        );
         assert.equal(report.readOnly, true);
         assert.equal(report.debts.invalidCount, 1);
         assert.equal(report.debts.invalidRecords, invalidDebts);
+        assert.equal(report.balances.legacyFieldCount, 1);
+        assert.equal(report.balances.mismatchCount, 1);
+        assert.deepEqual(report.balances.mismatches[0], {
+            userId: 'user-1',
+            stored: { owe: 10, owes: 50 },
+            derived: { owe: 25, owes: 50 }
+        });
         assert.equal(report.groups.legacyUniqueNameIndexCount, 1);
         assert.equal(report.groups.legacyUniqueNameIndexes[0].name, 'name_1');
         assert.ok(!Number.isNaN(Date.parse(report.generatedAt)));

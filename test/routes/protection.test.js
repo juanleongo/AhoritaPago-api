@@ -9,7 +9,8 @@ const { routers } = createCompositionRoot({
 const {
     debt: debtRouter,
     group: groupRouter,
-    user: userRouter
+    user: userRouter,
+    v2: v2Routers
 } = routers;
 
 const findMiddlewareIndex = (router, middlewareName) => (
@@ -61,5 +62,34 @@ describe('protección de rutas', () => {
         assert.ok(historyIndex >= 0);
         assert.ok(dynamicIdIndex >= 0);
         assert.ok(historyIndex < dynamicIdIndex);
+    });
+
+    it('protege v2 y publica únicamente su registro de usuarios', () => {
+        const userAuthIndex = findMiddlewareIndex(
+            v2Routers.user,
+            'authVerify'
+        );
+        const groupAuthIndex = findMiddlewareIndex(
+            v2Routers.group,
+            'authVerify'
+        );
+        const debtAuthIndex = findMiddlewareIndex(
+            v2Routers.debt,
+            'authVerify'
+        );
+
+        assert.deepEqual(routesBefore(v2Routers.user, userAuthIndex), [
+            { path: '/', methods: ['post'] }
+        ]);
+        assert.deepEqual(routesBefore(v2Routers.group, groupAuthIndex), []);
+        assert.deepEqual(routesBefore(v2Routers.debt, debtAuthIndex), []);
+    });
+
+    it('no incluye el alias de grupos deprecado dentro de v2', () => {
+        const paths = v2Routers.group.stack
+            .filter(layer => layer.route)
+            .map(layer => layer.route.path);
+
+        assert.equal(paths.includes('/mygroups'), false);
     });
 });

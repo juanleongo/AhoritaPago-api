@@ -33,6 +33,10 @@ class Server {
         group:       '/api/group',
         payment:      '/api/payment',
         user:         '/api/user',
+        authV2:       '/api/v2/auth',
+        groupV2:      '/api/v2/group',
+        paymentV2:    '/api/v2/payment',
+        userV2:       '/api/v2/user',
         transaction:  '/api/transaction',
         admin:         '/api/admin',
        
@@ -82,6 +86,10 @@ class Server {
     }
 
     routes() {
+        this.app.use(this.paths.groupV2, this.compositionRoot.routers.v2.group)
+        this.app.use(this.paths.userV2, this.compositionRoot.routers.v2.user)
+        this.app.use(this.paths.authV2, this.compositionRoot.routers.v2.auth)
+        this.app.use(this.paths.paymentV2, this.compositionRoot.routers.v2.debt)
         this.app.use(this.paths.group, this.compositionRoot.routers.group)
         this.app.use(this.paths.user, this.compositionRoot.routers.user)
         this.app.use(this.paths.auth, this.compositionRoot.routers.auth)

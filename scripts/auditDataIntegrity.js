@@ -2,6 +2,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Debt = require('../src/models/debt');
 const Group = require('../src/models/group');
+const User = require('../src/models/user');
 const { auditDataIntegrity } = require('../src/audits/dataIntegrity');
 
 const run = async () => {
@@ -13,7 +14,8 @@ const run = async () => {
         await mongoose.connect(process.env.DATABASE_URL);
         const report = await auditDataIntegrity({
             DebtModel: Debt,
-            GroupModel: Group
+            GroupModel: Group,
+            UserModel: User
         });
 
         process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

@@ -191,3 +191,40 @@ test('rechaza la configuración inválida antes de construir Express', () => {
         }
     );
 });
+
+test('expone autenticación v2 sin retirar la ruta legacy', async () => {
+    const compositionRoot = createCompositionRoot({
+        infrastructure: { config: createTestAppConfig() },
+        services: {
+            auth: {
+                async login() {
+                    return 'token-v2';
+                }
+            }
+        }
+    });
+    const server = new Server({ compositionRoot });
+
+    await withHttpServer(server, async baseUrl => {
+        const request = path => fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: 'user@example.com',
+                password: 'password'
+            })
+        });
+        const [legacyResponse, v2Response] = await Promise.all([
+            request('/api/auth/login'),
+            request('/api/v2/auth/login')
+        ]);
+
+        assert.deepEqual(await legacyResponse.json(), {
+            token: 'token-v2'
+        });
+        assert.deepEqual(await v2Response.json(), {
+            success: true,
+            data: { token: 'token-v2' }
+        });
+    });
+});

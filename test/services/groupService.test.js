@@ -134,7 +134,7 @@ describe('groupService: membresía y administración', () => {
                             'nuevo',
                             'member'
                         );
-                        assert.equal(result.group, updatedGroup);
+                        assert.equal(result, updatedGroup);
                     }
                 );
             }

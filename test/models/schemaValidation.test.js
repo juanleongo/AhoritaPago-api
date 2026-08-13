@@ -57,6 +57,18 @@ describe('integridad de los esquemas Mongoose', () => {
         );
     });
 
+    it('persiste una deuda independiente por cada deudor', async () => {
+        await assert.rejects(
+            () => buildDebt({
+                debtor: [
+                    ids.debtor,
+                    '507f191e810c19729de860ec'
+                ]
+            }).validate(),
+            rejectsPath('debtor')
+        );
+    });
+
     it('impide que el acreedor también sea deudor', async () => {
         await assert.rejects(
             () => buildDebt({ debtor: [ids.creditor] }).validate(),
@@ -141,5 +153,10 @@ describe('integridad de los esquemas Mongoose', () => {
 
         assert.ok(index);
         assert.deepEqual(index[0], { state: 1, nickname: 1, _id: 1 });
+    });
+
+    it('no persiste saldos derivados en el usuario', () => {
+        assert.equal(User.schema.path('owe'), undefined);
+        assert.equal(User.schema.path('owes'), undefined);
     });
 });

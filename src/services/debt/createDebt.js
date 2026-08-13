@@ -69,8 +69,7 @@ const createCreateDebt = ({
     debtAccess,
     debtRepository,
     groupRepository,
-    transactionManager,
-    userService
+    transactionManager
 }) => {
     const assertGroupParticipants = (
         targetGroup,
@@ -110,7 +109,6 @@ const createCreateDebt = ({
         const { description, value, group } = debtData;
         const creditorId = creditorData.userId;
         const debtorIds = validateDebtInput(debtData, creditorId);
-        const totalCreditValue = value * debtorIds.length;
 
         return transactionManager.runInTransaction(async transaction => {
             const targetGroup = await groupRepository.findActiveById(
@@ -137,19 +135,7 @@ const createCreateDebt = ({
                     { transaction }
                 );
                 transactionDebts.push(createdDebt);
-
-                await userService.incrementUserBalances(
-                    debtorId,
-                    { owe: value },
-                    transaction
-                );
             }
-
-            await userService.incrementUserBalances(
-                creditorId,
-                { owes: totalCreditValue },
-                transaction
-            );
 
             return transactionDebts;
         });

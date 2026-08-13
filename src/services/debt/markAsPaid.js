@@ -3,8 +3,7 @@ const { createHttpError } = require('../../helpers/httpError');
 const createMarkAsPaid = ({
     debtAccess,
     debtRepository,
-    transactionManager,
-    userService
+    transactionManager
 }) => {
     const markAsPaid = async (id, userId) => (
         transactionManager.runInTransaction(async transaction => {
@@ -25,20 +24,6 @@ const createMarkAsPaid = ({
                     409,
                     'La deuda ya fue marcada como pagada',
                     'DEBT_ALREADY_PAID'
-                );
-            }
-
-            await userService.incrementUserBalances(
-                debtAccess.toIdString(debt.creditor),
-                { owes: -debt.value },
-                transaction
-            );
-
-            for (const debtorId of debt.debtor) {
-                await userService.incrementUserBalances(
-                    debtAccess.toIdString(debtorId),
-                    { owe: -debt.value },
-                    transaction
                 );
             }
 

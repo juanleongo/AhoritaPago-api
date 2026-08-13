@@ -14,9 +14,11 @@ const updateUserDto = data => pickFields(data, [
 ]);
 
 const nicknameLookupDto = data => pickFields(data, ['nick']);
+const nicknameParamDto = data => pickFields(data, ['nickname']);
 
 module.exports = {
     createUserDto,
     nicknameLookupDto,
+    nicknameParamDto,
     updateUserDto
 };

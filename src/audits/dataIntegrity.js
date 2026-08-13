@@ -47,6 +47,13 @@ const buildDebtIntegrityPipeline = () => [
                     },
                     {
                         $cond: [
+                            { $ne: [{ $size: '$debtors' }, 1] },
+                            ['DEBTOR_CARDINALITY_INVALID'],
+                            []
+                        ]
+                    },
+                    {
+                        $cond: [
                             { $in: [null, '$debtors'] },
                             ['DEBTOR_ITEM_INVALID'],
                             []
@@ -119,6 +126,74 @@ const buildDebtIntegrityPipeline = () => [
     }
 ];
 
+const buildActiveBalancesPipeline = () => [
+    { $match: { state: true } },
+    {
+        $project: {
+            creditor: 1,
+            debtors: {
+                $cond: [
+                    { $isArray: '$debtor' },
+                    '$debtor',
+                    []
+                ]
+            },
+            safeValue: {
+                $cond: [
+                    { $isNumber: '$value' },
+                    '$value',
+                    0
+                ]
+            }
+        }
+    },
+    {
+        $project: {
+            entries: {
+                $concatArrays: [
+                    {
+                        $cond: [
+                            {
+                                $ne: [
+                                    { $ifNull: ['$creditor', null] },
+                                    null
+                                ]
+                            },
+                            [{
+                                userId: '$creditor',
+                                owe: 0,
+                                owes: '$safeValue'
+                            }],
+                            []
+                        ]
+                    },
+                    {
+                        $map: {
+                            input: '$debtors',
+                            as: 'debtorId',
+                            in: {
+                                userId: '$$debtorId',
+                                owe: '$safeValue',
+                                owes: 0
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    { $unwind: '$entries' },
+    { $match: { 'entries.userId': { $ne: null } } },
+    {
+        $group: {
+            _id: '$entries.userId',
+            owe: { $sum: '$entries.owe' },
+            owes: { $sum: '$entries.owes' }
+        }
+    },
+    { $project: { _id: 0, userId: '$_id', owe: 1, owes: 1 } }
+];
+
 const findLegacyUniqueGroupNameIndexes = indexes => indexes.filter(index => {
     const indexedFields = Object.keys(index.key || {});
 
@@ -127,10 +202,69 @@ const findLegacyUniqueGroupNameIndexes = indexes => indexes.filter(index => {
         && indexedFields[0] === 'name';
 });
 
-const auditDataIntegrity = async ({ DebtModel, GroupModel }) => {
-    const [invalidDebts, groupIndexes] = await Promise.all([
+const toIdString = id => id?.toString();
+
+const auditStoredBalances = (users, derivedBalances) => {
+    const balancesByUser = new Map(
+        derivedBalances.map(balance => [
+            toIdString(balance.userId),
+            { owe: balance.owe, owes: balance.owes }
+        ])
+    );
+    const existingUserIds = new Set();
+    const mismatches = [];
+    let legacyFieldCount = 0;
+
+    users.forEach(user => {
+        const userId = toIdString(user._id);
+        const hasOwe = Object.prototype.hasOwnProperty.call(user, 'owe');
+        const hasOwes = Object.prototype.hasOwnProperty.call(user, 'owes');
+        const hasLegacyFields = hasOwe || hasOwes;
+        const stored = {
+            owe: Number.isFinite(user.owe) ? user.owe : 0,
+            owes: Number.isFinite(user.owes) ? user.owes : 0
+        };
+        const derived = balancesByUser.get(userId) || { owe: 0, owes: 0 };
+
+        existingUserIds.add(userId);
+        if (hasLegacyFields) {
+            legacyFieldCount += 1;
+        }
+        if (
+            hasLegacyFields
+            && (stored.owe !== derived.owe || stored.owes !== derived.owes)
+        ) {
+            mismatches.push({ userId, stored, derived });
+        }
+    });
+
+    const orphanParticipantIds = derivedBalances
+        .map(balance => toIdString(balance.userId))
+        .filter(userId => !existingUserIds.has(userId));
+
+    return {
+        legacyFieldCount,
+        mismatchCount: mismatches.length,
+        mismatches,
+        orphanParticipantCount: orphanParticipantIds.length,
+        orphanParticipantIds
+    };
+};
+
+const auditDataIntegrity = async ({ DebtModel, GroupModel, UserModel }) => {
+    const [
+        invalidDebts,
+        groupIndexes,
+        derivedBalances,
+        users
+    ] = await Promise.all([
         DebtModel.aggregate(buildDebtIntegrityPipeline()),
-        GroupModel.collection.indexes()
+        GroupModel.collection.indexes(),
+        DebtModel.aggregate(buildActiveBalancesPipeline()),
+        UserModel.collection.find(
+            {},
+            { projection: { _id: 1, owe: 1, owes: 1 } }
+        ).toArray()
     ]);
     const legacyUniqueGroupNameIndexes = (
         findLegacyUniqueGroupNameIndexes(groupIndexes)
@@ -143,6 +277,7 @@ const auditDataIntegrity = async ({ DebtModel, GroupModel }) => {
             invalidCount: invalidDebts.length,
             invalidRecords: invalidDebts
         },
+        balances: auditStoredBalances(users, derivedBalances),
         groups: {
             legacyUniqueNameIndexCount: (
                 legacyUniqueGroupNameIndexes.length
@@ -154,6 +289,8 @@ const auditDataIntegrity = async ({ DebtModel, GroupModel }) => {
 
 module.exports = {
     auditDataIntegrity,
+    auditStoredBalances,
+    buildActiveBalancesPipeline,
     buildDebtIntegrityPipeline,
     findLegacyUniqueGroupNameIndexes
 };

@@ -60,6 +60,16 @@ const nicknameLookupValidators = [
     requiredText('nick', 'El nickname')
 ];
 
+const nicknameParamValidators = [
+    param('nickname')
+        .isString()
+        .withMessage('El nickname debe ser texto.')
+        .bail()
+        .trim()
+        .isLength({ min: 1, max: 50 })
+        .withMessage('El nickname debe tener entre 1 y 50 caracteres.')
+];
+
 const searchUsersValidators = [
     param('searchTerm')
         .isString()
@@ -73,6 +83,7 @@ const searchUsersValidators = [
 module.exports = {
     createUserValidators,
     nicknameLookupValidators,
+    nicknameParamValidators,
     searchUsersValidators,
     updateUserValidators,
     userIdValidators

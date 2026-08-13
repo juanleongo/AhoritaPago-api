@@ -22,6 +22,12 @@ const createInjectedDependencies = () => {
             };
         }
     };
+    const debtRepository = {
+        async getActiveBalanceByUserId(id) {
+            calls.push(['getActiveBalanceByUserId', id]);
+            return { owe: 15, owes: 40 };
+        }
+    };
     const passwordHasher = {
         async compare(password, hash) {
             calls.push(['compare', password, hash]);
@@ -49,7 +55,7 @@ const createInjectedDependencies = () => {
         repositories: {
             user: userRepository,
             group: {},
-            debt: {}
+            debt: debtRepository
         },
         infrastructure: {
             config: createTestAppConfig(),
@@ -96,10 +102,13 @@ describe('composition root e inyección de dependencias', () => {
             'password'
         );
 
-        assert.equal(user._id, 'user-1');
+        assert.equal(user.uid, 'user-1');
+        assert.equal(user.owe, 15);
+        assert.equal(user.owes, 40);
         assert.equal(token, 'injected-token');
         assert.deepEqual(calls, [
             ['findActiveById', 'user-1'],
+            ['getActiveBalanceByUserId', 'user-1'],
             ['findByEmail', 'user@example.com'],
             ['compare', 'password', 'hash'],
             [
@@ -143,13 +152,6 @@ describe('composition root e inyección de dependencias', () => {
                 },
                 user: {}
             },
-            services: {
-                user: {
-                    async incrementUserBalances(id, changes, context) {
-                        assert.equal(context, transaction);
-                    }
-                }
-            }
         });
 
         const result = await root.services.debt.createDebt(
@@ -226,5 +228,60 @@ describe('composition root e inyección de dependencias', () => {
         assert.equal(result.statusCode, 200);
         assert.deepEqual(result.body, { uid: 'injected-user' });
         assert.ok(root.routers.user.stack.length > 0);
+    });
+
+    it('construye v2 con los mismos servicios y un contrato uniforme', async () => {
+        const calls = [];
+        const root = createCompositionRoot({
+            infrastructure: { config: createTestAppConfig() },
+            services: {
+                user: {
+                    async getUserByToken(user) {
+                        calls.push(user.userId);
+                        return {
+                            uid: user.userId,
+                            name: 'Usuario',
+                            nickname: 'usuario',
+                            owe: 0,
+                            owes: 0
+                        };
+                    }
+                }
+            }
+        });
+        const result = {};
+        const response = {
+            status(statusCode) {
+                result.statusCode = statusCode;
+                return this;
+            },
+            json(body) {
+                result.body = body;
+                return this;
+            }
+        };
+
+        await root.controllers.v2.user.getUserByToken(
+            { user: { userId: 'user-v2' } },
+            response,
+            error => { throw error; }
+        );
+
+        assert.deepEqual(calls, ['user-v2']);
+        assert.equal(result.statusCode, 200);
+        assert.deepEqual(result.body, {
+            success: true,
+            data: {
+                id: 'user-v2',
+                name: 'Usuario',
+                nickname: 'usuario',
+                owe: 0,
+                owes: 0
+            }
+        });
+        assert.ok(root.routers.v2.user.stack.length > 0);
+        assert.ok(root.routers.v2.group.stack.length > 0);
+        assert.ok(root.routers.v2.auth.stack.length > 0);
+        assert.ok(root.routers.v2.debt.stack.length > 0);
     });
 });

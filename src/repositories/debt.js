@@ -1,4 +1,5 @@
 const Debt = require('../models/debt');
+const { Types } = require('mongoose');
 const {
     applyTransaction,
     buildWriteOptions
@@ -17,6 +18,12 @@ const historySort = state => (
     state
         ? { debtDate: -1, _id: -1 }
         : { paymentDate: -1, debtDate: -1, _id: -1 }
+);
+
+const toAggregationId = userId => (
+    Types.ObjectId.isValid(userId)
+        ? new Types.ObjectId(userId)
+        : userId
 );
 
 const create = async (debtData, options = {}) => {
@@ -53,6 +60,64 @@ const existsActiveByParticipant = async (userId, options = {}) => {
     );
 
     return Boolean(existingDebt);
+};
+
+const getActiveBalanceByUserId = async (userId, options = {}) => {
+    const participantId = toAggregationId(userId);
+    const [balance] = await applyTransaction(
+        Debt.aggregate([
+            {
+                $match: {
+                    state: true,
+                    $or: [
+                        { creditor: participantId },
+                        { debtor: participantId }
+                    ]
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    owe: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $in: [
+                                        participantId,
+                                        {
+                                            $cond: [
+                                                { $isArray: '$debtor' },
+                                                '$debtor',
+                                                []
+                                            ]
+                                        }
+                                    ]
+                                },
+                                '$value',
+                                0
+                            ]
+                        }
+                    },
+                    owes: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$creditor', participantId] },
+                                '$value',
+                                0
+                            ]
+                        }
+                    }
+                }
+            },
+            { $project: { _id: 0, owe: 1, owes: 1 } }
+        ]),
+        options
+    );
+
+    return {
+        owe: balance?.owe ?? 0,
+        owes: balance?.owes ?? 0
+    };
 };
 
 const findActiveByDebtor = async (userId, options = {}) => (
@@ -138,5 +203,6 @@ module.exports = {
     findActiveByParticipantAndGroup,
     findById,
     findHistoryByParticipant,
+    getActiveBalanceByUserId,
     updateById
 };

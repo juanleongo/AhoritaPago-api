@@ -6,17 +6,13 @@ const {
     createDebtService
 } = require('../../src/services/debt/createDebtService');
 
-const userService = {
-    async incrementUserBalances() {}
-};
 const defaultTransactionManager = {
     runInTransaction: work => work({ id: 'default-transaction' })
 };
 const debtService = createDebtService({
     debtRepository,
     groupRepository,
-    transactionManager: defaultTransactionManager,
-    userService
+    transactionManager: defaultTransactionManager
 });
 
 const withStubs = async (target, stubs, work) => {
@@ -58,8 +54,7 @@ const createTestTransactionManager = () => {
 const createService = transactionManager => createDebtService({
     debtRepository,
     groupRepository,
-    transactionManager,
-    userService
+    transactionManager
 });
 
 describe('debtService: historial y consistencia financiera', () => {
@@ -161,12 +156,12 @@ describe('debtService: historial y consistencia financiera', () => {
         );
     });
 
-    it('crea deuda y saldos dentro de la misma transacción', async () => {
+    it('crea las deudas dentro de una misma transacción', async () => {
         const { state, transaction, transactionManager } = (
             createTestTransactionManager()
         );
         const service = createService(transactionManager);
-        const balanceUpdates = [];
+        const createdDebts = [];
 
         await withStubs(
             groupRepository,
@@ -185,58 +180,36 @@ describe('debtService: historial y consistencia financiera', () => {
                     {
                         create: async (data, options) => {
                             assert.deepEqual(options, { transaction });
+                            createdDebts.push(data);
                             return data;
                         }
                     },
                     async () => {
-                        await withStubs(
-                            userService,
+                        const debts = await service.createDebt(
                             {
-                                incrementUserBalances: async (
-                                    id,
-                                    changes,
-                                    receivedTransaction
-                                ) => {
-                                    assert.equal(
-                                        receivedTransaction,
-                                        transaction
-                                    );
-                                    balanceUpdates.push({ id, changes });
-                                }
+                                description: 'Cena',
+                                value: 50,
+                                group: 'group-1',
+                                debtor: ['debtor']
                             },
-                            async () => {
-                                const debts = await service.createDebt(
-                                    {
-                                        description: 'Cena',
-                                        value: 50,
-                                        group: 'group-1',
-                                        debtor: ['debtor']
-                                    },
-                                    { userId: 'creditor' }
-                                );
-
-                                assert.equal(debts.length, 1);
-                            }
+                            { userId: 'creditor' }
                         );
+
+                        assert.equal(debts.length, 1);
                     }
                 );
             }
         );
 
         assert.equal(state.committed, true);
-        assert.deepEqual(balanceUpdates, [
-            { id: 'debtor', changes: { owe: 50 } },
-            { id: 'creditor', changes: { owes: 50 } }
-        ]);
+        assert.equal(createdDebts.length, 1);
     });
 
-    it('revierte saldos al eliminar una deuda activa', async () => {
+    it('elimina una deuda sin modificar documentos de usuario', async () => {
         const { state, transaction, transactionManager } = (
             createTestTransactionManager()
         );
         const service = createService(transactionManager);
-        const balanceUpdates = [];
-
         await withStubs(
             debtRepository,
             {
@@ -255,30 +228,11 @@ describe('debtService: historial y consistencia financiera', () => {
                 }
             },
             async () => {
-                await withStubs(
-                    userService,
-                    {
-                        incrementUserBalances: async (
-                            id,
-                            changes,
-                            receivedTransaction
-                        ) => {
-                            assert.equal(receivedTransaction, transaction);
-                            balanceUpdates.push({ id, changes });
-                        }
-                    },
-                    async () => {
-                        await service.deleteDebt('debt-1', 'creditor');
-                    }
-                );
+                await service.deleteDebt('debt-1', 'creditor');
             }
         );
 
         assert.equal(state.committed, true);
-        assert.deepEqual(balanceUpdates, [
-            { id: 'creditor', changes: { owes: -30 } },
-            { id: 'debtor', changes: { owe: -30 } }
-        ]);
     });
 
     it('marca una deuda como pagada con el mismo contexto', async () => {
@@ -286,7 +240,6 @@ describe('debtService: historial y consistencia financiera', () => {
             createTestTransactionManager()
         );
         const service = createService(transactionManager);
-        const balanceUpdates = [];
 
         await withStubs(
             debtRepository,
@@ -306,38 +259,19 @@ describe('debtService: historial y consistencia financiera', () => {
                 }
             },
             async () => {
-                await withStubs(
-                    userService,
-                    {
-                        incrementUserBalances: async (
-                            id,
-                            changes,
-                            receivedTransaction
-                        ) => {
-                            assert.equal(receivedTransaction, transaction);
-                            balanceUpdates.push({ id, changes });
-                        }
-                    },
-                    async () => {
-                        const paidDebt = await service.markAsPaid(
-                            'debt-1',
-                            'debtor'
-                        );
-
-                        assert.equal(paidDebt.state, false);
-                    }
+                const paidDebt = await service.markAsPaid(
+                    'debt-1',
+                    'debtor'
                 );
+
+                assert.equal(paidDebt.state, false);
             }
         );
 
         assert.equal(state.committed, true);
-        assert.deepEqual(balanceUpdates, [
-            { id: 'creditor', changes: { owes: -25 } },
-            { id: 'debtor', changes: { owe: -25 } }
-        ]);
     });
 
-    it('aborta la transacción cuando falla una operación financiera', async () => {
+    it('aborta la transacción cuando falla la creación de una deuda', async () => {
         const { state, transactionManager } = createTestTransactionManager();
         const service = createService(transactionManager);
 
@@ -346,35 +280,34 @@ describe('debtService: historial y consistencia financiera', () => {
             {
                 findActiveById: async () => ({
                     state: true,
-                    members: ['creditor', 'debtor']
+                    members: ['creditor', 'debtor-1', 'debtor-2']
                 })
             },
             async () => {
+                let attempts = 0;
                 await withStubs(
                     debtRepository,
-                    { create: async data => data },
-                    async () => {
-                        await withStubs(
-                            userService,
-                            {
-                                incrementUserBalances: async () => {
-                                    throw new Error('Fallo simulado');
-                                }
-                            },
-                            async () => {
-                                await assert.rejects(
-                                    () => service.createDebt(
-                                        {
-                                            description: 'Cena',
-                                            value: 50,
-                                            group: 'group-1',
-                                            debtor: ['debtor']
-                                        },
-                                        { userId: 'creditor' }
-                                    ),
-                                    /Fallo simulado/
-                                );
+                    {
+                        create: async data => {
+                            attempts += 1;
+                            if (attempts === 2) {
+                                throw new Error('Fallo simulado');
                             }
+                            return data;
+                        }
+                    },
+                    async () => {
+                        await assert.rejects(
+                            () => service.createDebt(
+                                {
+                                    description: 'Cena',
+                                    value: 50,
+                                    group: 'group-1',
+                                    debtor: ['debtor-1', 'debtor-2']
+                                },
+                                { userId: 'creditor' }
+                            ),
+                            /Fallo simulado/
                         );
                     }
                 );

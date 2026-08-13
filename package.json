@@ -6,6 +6,8 @@
   "scripts": {
     "audit:data": "node scripts/auditDataIntegrity.js",
     "dev": "nodemon index.js",
+    "migrate:balances:dry-run": "node scripts/removeDerivedUserBalances.js",
+    "migrate:balances": "node scripts/removeDerivedUserBalances.js --execute",
     "start": "node index.js",
     "test": "node --test",
     "test:watch": "node --test --watch"

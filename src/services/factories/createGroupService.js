@@ -179,15 +179,10 @@ const createGroupService = ({
             );
         }
 
-        const updatedGroup = await groupRepository.addMemberById(
+        return groupRepository.addMemberById(
             group._id,
             user._id
         );
-
-        return {
-            message: 'Usuario agregado al grupo exitosamente',
-            group: updatedGroup
-        };
     };
 
     return {

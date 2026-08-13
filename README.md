@@ -13,7 +13,7 @@ Versión actual: **2.0.0**.
 - Creación de grupos con administrador, integrantes y código único.
 - Incorporación de personas al grupo por nickname.
 - Creación de una deuda independiente por cada deudor.
-- Saldos acumulados:
+- Saldos derivados de las deudas activas:
   - `owe`: valor que debe el usuario.
   - `owes`: valor que le deben al usuario.
 - Pago y eliminación de deudas con transacciones de MongoDB.
@@ -370,7 +370,7 @@ src/services/debt/
     ├── createDebtService.js       Ensamblaje de los casos de uso
     ├── debtAccess.js              Identidad, participación y búsqueda común
     ├── createDebt.js              Creación transaccional
-    ├── deleteDebt.js              Eliminación y reversión de saldos
+    ├── deleteDebt.js              Eliminación autorizada
     ├── getAllDebts.js             Listado de deudas activas
     ├── getDebtById.js             Consulta autorizada por ID
     ├── getDebtHistoryForUser.js   Historial activo y pagado
@@ -383,6 +383,16 @@ src/services/debt/
 El composition root crea el servicio de deudas y lo inyecta en la fábrica pura
 del controlador. No existe una instancia predeterminada construida al importar
 el módulo.
+
+El servicio de balance se construye por separado en
+`src/services/balance/createBalanceService.js`. Consulta el repositorio de
+deudas y enriquece las respuestas públicas del usuario. El servicio de deudas
+ya no depende del servicio de usuarios:
+
+```text
+UserService -> BalanceService -> DebtRepository
+DebtService ------------------> DebtRepository
+```
 
 ## Autenticación
 
@@ -486,8 +496,9 @@ Contratos de body:
 | Pagar o eliminar recursos | Ninguno |
 
 Si el cliente envía un campo fuera del contrato, la API responde `400` con
-el código `UNKNOWN_FIELDS`. Campos internos como `state`, `owe`, `owes`,
-`creditor`, `debtDate` y `paymentDate` nunca forman parte de los DTO públicos.
+el código `UNKNOWN_FIELDS`. Campos internos o calculados como `state`, `owe`,
+`owes`, `creditor`, `debtDate` y `paymentDate` nunca forman parte de los DTO de
+entrada públicos.
 
 La validación HTTP comprueba estructura, tipos y formatos. Las reglas que
 dependen del estado de la aplicación permanecen en los servicios; por ejemplo,
@@ -498,14 +509,14 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 ### Usuarios
 
 - El registro público solo acepta `name`, `nickname`, `email` y `password`.
-  Los saldos, el estado y los demás campos internos conservan los valores
-  definidos por el servidor.
+  Los saldos se calculan en el servidor y el estado conserva su valor interno.
 - Un usuario puede consultar, modificar y desactivar únicamente su perfil.
 - Un usuario no puede desactivar su cuenta mientras participe como acreedor o
   deudor en alguna deuda activa. La API responde `409` con el código
   `USER_HAS_ACTIVE_DEBTS` hasta que esas obligaciones se paguen o eliminen.
 - La edición del perfil permite `name`, `nickname` y `email`.
 - `owe`, `owes`, `state` y `password` no se pueden modificar directamente.
+  `owe` y `owes` se incluyen en el perfil como campos calculados.
 
 ### Grupos
 
@@ -520,9 +531,9 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 
 ### Deudas
 
-- Toda deuda requiere acreedor, uno o más deudores diferentes al acreedor y un
-  valor finito mayor que cero. Estas reglas se aplican en HTTP, servicios y
-  Mongoose.
+- La entrada HTTP acepta uno o más deudores diferentes al acreedor y un valor
+  finito mayor que cero. El servicio crea un documento independiente por cada
+  persona y Mongoose exige exactamente un deudor en cada documento persistido.
 - Acreedor y deudor pueden consultar la deuda.
 - Solo el acreedor puede modificar su descripción o eliminarla.
 - Acreedor y deudor pueden marcarla como pagada.
@@ -539,8 +550,10 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 | `email` | Correo único. |
 | `password` | Contraseña cifrada. |
 | `state` | Estado activo del usuario. |
-| `owe` | Total que debe. |
-| `owes` | Total que le deben. |
+
+`owe` y `owes` no se almacenan en `User`. Se agregan a las respuestas de
+perfil calculando las deudas con `state: true`, por lo que las deudas son la
+única fuente de verdad financiera.
 
 ### Group
 
@@ -558,8 +571,8 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 |---|---|
 | `description` | Concepto de la deuda. |
 | `creditor` | Usuario al que le deben. |
-| `debtor` | Lista de deudores. |
-| `value` | Valor por deudor. |
+| `debtor` | Arreglo con el único deudor de ese documento. |
+| `value` | Valor adeudado en ese documento. |
 | `group` | Grupo asociado. |
 | `debtDate` | Fecha de creación. |
 | `paymentDate` | Fecha de pago. |
@@ -578,9 +591,12 @@ npm run audit:data
 El reporte identifica:
 
 - deudas sin acreedor o sin deudores;
+- documentos que no contienen exactamente un deudor;
 - elementos nulos y deudores repetidos;
 - acreedores incluidos como deudores;
 - valores ausentes, no numéricos, iguales a cero o negativos;
+- diferencias entre los antiguos `owe` y `owes` y los saldos derivados;
+- participantes de deudas que no tienen un usuario asociado;
 - índices globales únicos heredados sobre `Group.name`.
 
 La auditoría no realiza escrituras. Un índice heredado `name_1` puede seguir
@@ -588,7 +604,140 @@ impidiendo nombres repetidos aunque el esquema actual no lo declare. Su
 eliminación y cualquier corrección de documentos debe hacerse por separado,
 con respaldo previo y después de revisar el reporte.
 
-## Endpoints
+### Retiro de los saldos heredados
+
+El código de la API ya no lee ni actualiza `User.owe` y `User.owes`. Los campos
+pueden permanecer temporalmente en documentos históricos para permitir una
+transición controlada. Antes de eliminarlos, ejecuta la simulación:
+
+```bash
+npm run migrate:balances:dry-run
+```
+
+La simulación solo cuenta los documentos afectados. Para realizar la escritura
+se requieren simultáneamente el indicador `--execute`, incluido por el script
+de npm, y esta confirmación exacta:
+
+```env
+CONFIRM_REMOVE_DERIVED_BALANCES=REMOVE_DERIVED_BALANCES
+```
+
+```bash
+npm run migrate:balances
+```
+
+No ejecutes la migración hasta comprobar que `npm run audit:data` no reporta
+deudas incompatibles, crear un respaldo y desplegar primero la versión que
+calcula los saldos. Para una reversión segura, pausa las escrituras durante la
+ventana de migración; antes de volver a una versión que persista saldos, restaura
+el respaldo o reconstruye ambos campos desde las deudas activas.
+
+## API HTTP v2
+
+La versión uniforme se publica bajo `/api/v2`. Los endpoints sin versión se
+mantienen temporalmente para que el frontend pueda migrar sin interrumpir el
+servicio desplegado. Ambas versiones comparten los mismos servicios,
+repositorios, autenticación y reglas de negocio.
+
+Toda respuesta exitosa v2 contiene `success` y `data`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "RESOURCE_ID"
+  }
+}
+```
+
+Los listados y resultados paginados colocan la información auxiliar en `meta`:
+
+```json
+{
+  "success": true,
+  "data": [],
+  "meta": {
+    "count": 0,
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalPages": 0,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
+  }
+}
+```
+
+`message` es opcional y se utiliza en operaciones de escritura. Una eliminación
+exitosa conserva el envelope y responde con `data: null`. Los errores utilizan
+el contrato global existente con `success: false` y `error`.
+
+Los DTO de salida v2 convierten `_id` en `id`, eliminan `__v`, nunca exponen la
+contraseña y normalizan las referencias de usuario, grupo y deuda.
+
+### Rutas v2
+
+| Recurso | Prefijo |
+|---|---|
+| Autenticación | `/api/v2/auth` |
+| Usuarios | `/api/v2/user` |
+| Grupos | `/api/v2/group` |
+| Deudas | `/api/v2/payment` |
+
+La búsqueda exacta por nickname no utiliza un body GET:
+
+```http
+GET /api/v2/user/by-nickname/leon
+Authorization: Bearer <token>
+```
+
+El nickname se valida y obtiene del parámetro `:nickname`. La búsqueda parcial
+continúa disponible en
+`GET /api/v2/user/search/:searchTerm?page=1&limit=20`.
+
+El historial v2 separa datos y metadatos:
+
+```json
+{
+  "success": true,
+  "data": {
+    "active": [],
+    "paid": []
+  },
+  "meta": {
+    "count": {
+      "total": 0,
+      "active": 0,
+      "paid": 0
+    },
+    "pagination": {
+      "active": {},
+      "paid": {}
+    }
+  }
+}
+```
+
+### Migración desde endpoints sin versión
+
+| Endpoint temporal | Endpoint v2 |
+|---|---|
+| `POST /api/auth/login` | `POST /api/v2/auth/login` |
+| `/api/user` | `/api/v2/user` |
+| `GET /api/user/nick` con body | `GET /api/v2/user/by-nickname/:nickname` |
+| `/api/group` | `/api/v2/group` |
+| `/api/payment` | `/api/v2/payment` |
+
+Al migrar el frontend debe leerse el recurso desde `response.data.data` si la
+librería HTTP conserva la respuesta completa, o desde `body.data` al trabajar
+directamente con `fetch`. Los conteos y la paginación pasan a `body.meta`.
+
+No se ha fijado una fecha para retirar `/api/*`. Su eliminación requiere
+comprobar primero que el frontend ya no lo consume y se hará como un cambio
+incompatible independiente.
+
+## Endpoints legacy
 
 Todas las rutas, excepto registro y login, requieren JWT.
 
@@ -715,7 +864,7 @@ documentos de deuda.
 | `POST` | `/api/payment` | Crea una deuda. |
 | `PUT` | `/api/payment/:id` | Modifica su descripción; solo acreedor. |
 | `PUT` | `/api/payment/pay/:id` | Marca la deuda como pagada. |
-| `DELETE` | `/api/payment/:id` | Elimina la deuda y revierte saldos si estaba activa. |
+| `DELETE` | `/api/payment/:id` | Elimina la deuda; el saldo derivado se actualiza automáticamente. |
 
 Crear deuda:
 
@@ -827,10 +976,11 @@ el contrato `transactionManager.runInTransaction(work)`. Su adaptador de
 infraestructura utiliza sesiones y transacciones de MongoDB.
 
 - Si todas las operaciones funcionan, se confirma la transacción.
-- Si alguna operación falla, MongoDB revierte documentos y saldos.
+- Si alguna operación falla, MongoDB revierte los documentos modificados.
 - El pago de una deuda no puede procesarse dos veces.
-- Eliminar una deuda activa revierte `owe` y `owes`.
-- Eliminar una deuda pagada no vuelve a modificar los saldos.
+- Crear, pagar o eliminar una deuda cambia automáticamente el saldo calculado.
+- Las deudas pagadas no forman parte de `owe` ni `owes`.
+- No se actualizan documentos de usuario durante las operaciones de deuda.
 - La desactivación consulta las deudas activas y modifica el usuario dentro de
   la misma transacción, evitando cuentas inactivas con obligaciones abiertas.
 
@@ -880,7 +1030,13 @@ Cobertura inicial:
 - Inyección directa de conexión y puerto en `Server`.
 - Propagación de un único contexto transaccional.
 - Commit, abort, retorno y cierre de transacciones mediante el adaptador.
-- Reversión de saldos al eliminar deudas.
+- Cálculo indexado de `owe` y `owes` desde deudas activas.
+- Ausencia de escrituras de saldo al crear, pagar o eliminar deudas.
+- Simulación y ejecución protegida de la migración de campos heredados.
+- Envelope uniforme y DTO de salida explícitos para todos los controladores v2.
+- Montaje simultáneo de endpoints legacy y `/api/v2` sobre los mismos servicios.
+- Búsqueda exacta de nickname mediante un parámetro de ruta y sin body GET.
+- Ausencia de `_id`, `__v` y `password` en los recursos v2.
 - Bloqueo transaccional de la desactivación cuando existen deudas activas.
 - Encabezados de Helmet, CORS local y límite de cuerpos JSON.
 - Rate limiting deshabilitado por defecto y contratos `429` de los tres

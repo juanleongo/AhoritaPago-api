@@ -24,8 +24,7 @@ describe('estructura modular del servicio de deudas', () => {
         const debtService = createDebtService({
             debtRepository: {},
             groupRepository: {},
-            transactionManager: {},
-            userService: {}
+            transactionManager: {}
         });
 
         assert.deepEqual(Object.keys(debtService).sort(), [

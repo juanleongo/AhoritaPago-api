@@ -2,6 +2,37 @@
 
 ## Sin publicar
 
+### Contrato HTTP uniforme (REC-11)
+
+- Se agregó `/api/v2` con un envelope uniforme basado en `success`, `data`,
+  `meta` y `message`.
+- Se incorporaron DTO de salida para usuarios, grupos, deudas, resúmenes y
+  referencias. Los recursos v2 usan `id` y no exponen `_id`, `__v` ni
+  contraseñas.
+- La búsqueda exacta pasa a
+  `GET /api/v2/user/by-nickname/:nickname`, sin cuerpo en la solicitud GET.
+- Los controladores legacy y v2 comparten los mismos servicios y repositorios.
+  `/api/*` permanece disponible durante la migración del frontend.
+- El servicio de grupos devuelve el grupo actualizado al agregar integrantes;
+  los mensajes HTTP se generan en cada adaptador de controlador.
+- No se fijó una fecha de retiro para los endpoints sin versión.
+
+### Saldos derivados (REC-10)
+
+- `Debt` es ahora la única fuente de verdad para `owe` y `owes`; ambos campos
+  conservan su contrato JSON, pero se calculan desde deudas activas.
+- Se agregó un servicio de balance y una agregación indexada en el repositorio
+  de deudas.
+- Crear, pagar y eliminar deudas dejó de modificar documentos de usuario y el
+  servicio de deudas dejó de depender del servicio de usuarios.
+- `owe` y `owes` se retiraron del esquema `User` y cada documento `Debt` exige
+  exactamente un deudor.
+- La auditoría compara saldos heredados con saldos derivados y detecta deudas
+  con cardinalidad incompatible.
+- Se agregó una migración con simulación predeterminada y doble confirmación
+  para retirar los campos heredados de MongoDB. La migración no se ejecuta al
+  iniciar la API.
+
 ### Código muerto y endpoint duplicado de grupos
 
 - Se eliminaron los archivos `index.js` vacíos de `adapters`, `models`,

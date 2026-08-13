@@ -7,6 +7,7 @@ const isSameUser = (userId, authenticatedUserId) => (
 );
 
 const createUserService = ({
+    balanceService,
     debtRepository,
     passwordHasher,
     transactionManager,
@@ -30,7 +31,7 @@ const createUserService = ({
             );
         }
 
-        return user;
+        return balanceService.withActiveBalance(user);
     };
 
     const getByNickname = async nickname => {
@@ -82,7 +83,7 @@ const createUserService = ({
             );
         }
 
-        return user;
+        return balanceService.withActiveBalance(user);
     };
 
     const createUser = async userData => {
@@ -117,12 +118,14 @@ const createUserService = ({
         const salt = await passwordHasher.genSalt();
         const hashedPassword = await passwordHasher.hash(password, salt);
 
-        return userRepository.create({
+        const createdUser = await userRepository.create({
             name,
             email,
             nickname,
             password: hashedPassword
         });
+
+        return balanceService.withActiveBalance(createdUser);
     };
 
     const updateUser = async (id, userData, authenticatedUserId) => {
@@ -158,7 +161,9 @@ const createUserService = ({
             );
         }
 
-        return userRepository.updateById(id, allowedData);
+        const updatedUser = await userRepository.updateById(id, allowedData);
+
+        return balanceService.withActiveBalance(updatedUser);
     };
 
     const deleteUser = async (id, authenticatedUserId) => {
@@ -201,52 +206,12 @@ const createUserService = ({
         });
     };
 
-    const incrementUserBalances = async (
-        id,
-        balanceChanges,
-        transaction = null
-    ) => {
-        const existingUser = await userRepository.findActiveById(
-            id,
-            { transaction }
-        );
-        if (!existingUser) {
-            throw createHttpError(
-                404,
-                'Usuario no encontrado',
-                'USER_NOT_FOUND'
-            );
-        }
-
-        const safeChanges = {};
-        ['owe', 'owes'].forEach(field => {
-            if (Number.isFinite(balanceChanges[field])) {
-                safeChanges[field] = balanceChanges[field];
-            }
-        });
-
-        if (Object.keys(safeChanges).length === 0) {
-            throw createHttpError(
-                400,
-                'No se enviaron cambios de saldo válidos',
-                'BALANCE_CHANGES_INVALID'
-            );
-        }
-
-        return userRepository.updateById(
-            id,
-            { $inc: safeChanges },
-            { transaction }
-        );
-    };
-
     return {
         createUser,
         deleteUser,
         getByNickname,
         getUserById,
         getUserByToken,
-        incrementUserBalances,
         searchUsersByNickname,
         updateUser
     };

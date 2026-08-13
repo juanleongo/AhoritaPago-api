@@ -4,11 +4,21 @@ const {
     createGroupDto,
     updateGroupDto
 } = require('../../dtos/groupDtos');
+const {
+    createSuccessResponse
+} = require('../../dtos/output/responseDto');
+const {
+    groupResponseDto
+} = require('../../dtos/output/groupResponseDtos');
 
-const createGroupController = ({ groupService }) => {
+const createGroupControllerV2 = ({ groupService }) => {
     const getGroupsForUser = asyncHandler(async (req, res) => {
         const groups = await groupService.getGroupsForUser(req.user.userId);
-        res.status(200).json(groups);
+
+        res.status(200).json(createSuccessResponse({
+            data: groups.map(groupResponseDto),
+            meta: { count: groups.length }
+        }));
     });
 
     const getGroupById = asyncHandler(async (req, res) => {
@@ -17,23 +27,34 @@ const createGroupController = ({ groupService }) => {
             req.user.userId
         );
 
-        res.status(200).json(group);
+        res.status(200).json(createSuccessResponse({
+            data: groupResponseDto(group)
+        }));
     });
 
     const createGroup = asyncHandler(async (req, res) => {
-        const groupData = createGroupDto(req.validated.body);
-        const newGroup = await groupService.createGroup(groupData, req.user);
-        res.status(201).json(newGroup);
+        const group = await groupService.createGroup(
+            createGroupDto(req.validated.body),
+            req.user
+        );
+
+        res.status(201).json(createSuccessResponse({
+            data: groupResponseDto(group),
+            message: 'Grupo creado correctamente'
+        }));
     });
 
     const updateGroup = asyncHandler(async (req, res) => {
-        const updatedGroup = await groupService.updateGroup(
+        const group = await groupService.updateGroup(
             req.validated.params.id,
             updateGroupDto(req.validated.body),
             req.user.userId
         );
 
-        res.status(200).json(updatedGroup);
+        res.status(200).json(createSuccessResponse({
+            data: groupResponseDto(group),
+            message: 'Grupo actualizado correctamente'
+        }));
     });
 
     const deleteGroup = asyncHandler(async (req, res) => {
@@ -41,9 +62,11 @@ const createGroupController = ({ groupService }) => {
             req.validated.params.id,
             req.user.userId
         );
-        res.status(200).json({
+
+        res.status(200).json(createSuccessResponse({
+            data: null,
             message: 'Grupo eliminado correctamente'
-        });
+        }));
     });
 
     const addMember = asyncHandler(async (req, res) => {
@@ -56,10 +79,10 @@ const createGroupController = ({ groupService }) => {
             req.user.userId
         );
 
-        res.status(200).json({
-            message: 'Usuario agregado al grupo exitosamente',
-            group
-        });
+        res.status(200).json(createSuccessResponse({
+            data: groupResponseDto(group),
+            message: 'Usuario agregado al grupo exitosamente'
+        }));
     });
 
     return {
@@ -72,4 +95,4 @@ const createGroupController = ({ groupService }) => {
     };
 };
 
-module.exports = { createGroupController };
+module.exports = { createGroupControllerV2 };

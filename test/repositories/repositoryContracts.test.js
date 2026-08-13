@@ -60,6 +60,7 @@ describe('contratos de repositorios', () => {
             'findActiveByParticipantAndGroup',
             'findById',
             'findHistoryByParticipant',
+            'getActiveBalanceByUserId',
             'updateById'
         ]);
     });
@@ -230,6 +231,53 @@ describe('contratos de repositorios', () => {
             { creditor: '507f1f77bcf86cd799439011' },
             { debtor: '507f1f77bcf86cd799439011' }
         ]);
+    });
+
+    it('calcula los saldos usando solo deudas activas', async () => {
+        const originalAggregate = Debt.aggregate;
+        const userId = '507f1f77bcf86cd799439011';
+        let receivedPipeline;
+
+        Debt.aggregate = async pipeline => {
+            receivedPipeline = pipeline;
+            return [{ owe: 45, owes: 80 }];
+        };
+
+        try {
+            assert.deepEqual(
+                await debtRepository.getActiveBalanceByUserId(userId),
+                { owe: 45, owes: 80 }
+            );
+        } finally {
+            Debt.aggregate = originalAggregate;
+        }
+
+        assert.equal(receivedPipeline[0].$match.state, true);
+        assert.equal(
+            receivedPipeline[0].$match.$or[0].creditor.toString(),
+            userId
+        );
+        assert.equal(
+            receivedPipeline[0].$match.$or[1].debtor.toString(),
+            userId
+        );
+        assert.match(JSON.stringify(receivedPipeline), /\$sum/);
+    });
+
+    it('devuelve saldos en cero si no hay deudas activas', async () => {
+        const originalAggregate = Debt.aggregate;
+        Debt.aggregate = async () => [];
+
+        try {
+            assert.deepEqual(
+                await debtRepository.getActiveBalanceByUserId(
+                    '507f1f77bcf86cd799439011'
+                ),
+                { owe: 0, owes: 0 }
+            );
+        } finally {
+            Debt.aggregate = originalAggregate;
+        }
     });
 
     it('consulta deudas activas dentro de la transacción', async () => {

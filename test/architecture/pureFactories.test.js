@@ -47,7 +47,8 @@ describe('fábricas puras y carga de módulos', () => {
             './src/routes/factories/createAuthRouter',
             './src/routes/factories/createDebtRouter',
             './src/routes/factories/createGroupRouter',
-            './src/routes/factories/createUserRouter'
+            './src/routes/factories/createUserRouter',
+            './src/routes/v2/createUserRouter'
         ];
         const source = `
             const express = require('express');

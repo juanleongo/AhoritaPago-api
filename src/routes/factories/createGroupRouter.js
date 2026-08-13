@@ -18,16 +18,22 @@ const deprecateMyGroups = createDeprecateEndpoint({
     successorPath: '/api/group'
 });
 
-const createGroupRouter = ({ authVerify, groupController }) => {
+const createGroupRouter = ({
+    authVerify,
+    groupController,
+    includeDeprecatedAliases = true
+}) => {
     const router = Router();
 
     router.use(authVerify);
 
-    router.get(
-        '/mygroups',
-        deprecateMyGroups,
-        groupController.getGroupsForUser
-    );
+    if (includeDeprecatedAliases) {
+        router.get(
+            '/mygroups',
+            deprecateMyGroups,
+            groupController.getGroupsForUser
+        );
+    }
     router.get('/', groupController.getGroupsForUser);
     router.get('/:id', [
         ...groupIdValidators,

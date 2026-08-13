@@ -4,6 +4,10 @@ const hasDebtors = debtors => (
     Array.isArray(debtors) && debtors.length > 0
 );
 
+const hasSingleDebtor = debtors => (
+    !Array.isArray(debtors) || debtors.length === 1
+);
+
 const hasUniqueDebtors = debtors => {
     if (!Array.isArray(debtors) || !debtors.every(Boolean)) {
         return true;
@@ -53,6 +57,10 @@ const DebtSchema = new Schema({
             {
                 validator: hasUniqueDebtors,
                 message: 'Los deudores no pueden repetirse'
+            },
+            {
+                validator: hasSingleDebtor,
+                message: 'Cada deuda debe pertenecer a un solo deudor'
             },
             {
                 validator: excludesCreditor,

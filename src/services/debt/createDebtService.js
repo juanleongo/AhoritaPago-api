@@ -18,8 +18,7 @@ const { createUpdateDebt } = require('./updateDebt');
 const createDebtService = ({
     debtRepository,
     groupRepository,
-    transactionManager,
-    userService
+    transactionManager
 }) => {
     const debtAccess = createDebtAccess({ debtRepository });
 
@@ -28,14 +27,12 @@ const createDebtService = ({
             debtAccess,
             debtRepository,
             groupRepository,
-            transactionManager,
-            userService
+            transactionManager
         }),
         deleteDebt: createDeleteDebt({
             debtAccess,
             debtRepository,
-            transactionManager,
-            userService
+            transactionManager
         }),
         getAllDebts: createGetAllDebts({ debtRepository }),
         getDebtById: createGetDebtById({ debtAccess }),
@@ -54,8 +51,7 @@ const createDebtService = ({
         markAsPaid: createMarkAsPaid({
             debtAccess,
             debtRepository,
-            transactionManager,
-            userService
+            transactionManager
         }),
         updateDebt: createUpdateDebt({
             debtAccess,

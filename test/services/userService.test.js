@@ -8,6 +8,11 @@ const {
 } = require('../../src/services/factories/createUserService');
 
 const userService = createUserService({
+    balanceService: {
+        async withActiveBalance(user) {
+            return { ...user, owe: 25, owes: 60 };
+        }
+    },
     debtRepository,
     passwordHasher: bcryptjs,
     transactionManager: {
@@ -124,7 +129,11 @@ describe('userService: autorización y campos permitidos', () => {
             { findActiveById: async () => expectedUser },
             async () => {
                 const user = await userService.getUserById('user-1', 'user-1');
-                assert.equal(user, expectedUser);
+                assert.deepEqual(user, {
+                    ...expectedUser,
+                    owe: 25,
+                    owes: 60
+                });
             }
         );
     });
@@ -161,34 +170,7 @@ describe('userService: autorización y campos permitidos', () => {
         });
     });
 
-    it('solo permite incrementos internos de owe y owes', async () => {
-        const transaction = { id: 'transaction-1' };
-        let persistedUpdate;
-
-        await withRepositoryStubs(
-            {
-                findActiveById: async (id, options) => {
-                    assert.deepEqual(options, { transaction });
-                    return { _id: id };
-                },
-                updateById: async (id, data, options) => {
-                    persistedUpdate = { id, data, options };
-                    return persistedUpdate;
-                }
-            },
-            async () => {
-                await userService.incrementUserBalances(
-                    'user-1',
-                    { owe: 20, state: 1 },
-                    transaction
-                );
-            }
-        );
-
-        assert.deepEqual(persistedUpdate, {
-            id: 'user-1',
-            data: { $inc: { owe: 20 } },
-            options: { transaction }
-        });
+    it('retira las mutaciones internas de saldos', () => {
+        assert.equal('incrementUserBalances' in userService, false);
     });
 });
