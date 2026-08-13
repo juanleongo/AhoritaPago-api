@@ -4,6 +4,7 @@ const {
     createGroupDto,
     updateGroupDto
 } = require('../../dtos/groupDtos');
+const { listPaginationDto } = require('../../dtos/paginationDtos');
 const {
     createSuccessResponse
 } = require('../../dtos/output/responseDto');
@@ -13,11 +14,17 @@ const {
 
 const createGroupControllerV2 = ({ groupService }) => {
     const getGroupsForUser = asyncHandler(async (req, res) => {
-        const groups = await groupService.getGroupsForUser(req.user.userId);
+        const result = await groupService.getGroupsForUser(
+            req.user.userId,
+            listPaginationDto(req.validated?.query)
+        );
 
         res.status(200).json(createSuccessResponse({
-            data: groups.map(groupResponseDto),
-            meta: { count: groups.length }
+            data: result.groups.map(groupResponseDto),
+            meta: {
+                count: result.count,
+                pagination: result.pagination
+            }
         }));
     });
 

@@ -128,5 +128,13 @@ DebtSchema.index(
     { group: 1, state: 1, debtor: 1 },
     { name: 'debt_group_state_debtor' }
 );
+DebtSchema.index(
+    { group: 1, state: 1, creditor: 1, debtDate: -1, _id: -1 },
+    { name: 'debt_group_creditor_active_page' }
+);
+DebtSchema.index(
+    { group: 1, state: 1, debtor: 1, debtDate: -1, _id: -1 },
+    { name: 'debt_group_debtor_active_page' }
+);
 
 module.exports = model('Debt', DebtSchema);

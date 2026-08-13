@@ -1,3 +1,12 @@
+const {
+    USER_IDENTITY_LIMITS,
+    hasIdentityLength,
+    isValidEmail,
+    normalizeEmail,
+    normalizeName,
+    normalizeNickname
+} = require('../config/userIdentity');
+
 const buildDebtIntegrityPipeline = () => [
     {
         $project: {
@@ -251,6 +260,56 @@ const auditStoredBalances = (users, derivedBalances) => {
     };
 };
 
+const auditUserIdentities = users => {
+    const invalidRecords = users.reduce((records, user) => {
+        const issues = [];
+        const normalizedName = normalizeName(user.name);
+        const normalizedNickname = normalizeNickname(user.nickname);
+        const normalizedEmail = normalizeEmail(user.email);
+
+        if (!hasIdentityLength(normalizedName, USER_IDENTITY_LIMITS.name)) {
+            issues.push('NAME_LENGTH_INVALID');
+        }
+        if (normalizedName !== user.name) {
+            issues.push('NAME_NOT_NORMALIZED');
+        }
+        if (!hasIdentityLength(
+            normalizedNickname,
+            USER_IDENTITY_LIMITS.nickname
+        )) {
+            issues.push('NICKNAME_LENGTH_INVALID');
+        }
+        if (normalizedNickname !== user.nickname) {
+            issues.push('NICKNAME_NOT_TRIMMED');
+        }
+        if (!hasIdentityLength(normalizedEmail, USER_IDENTITY_LIMITS.email)) {
+            issues.push('EMAIL_LENGTH_INVALID');
+        }
+        if (
+            !isValidEmail(normalizedEmail)
+        ) {
+            issues.push('EMAIL_FORMAT_INVALID');
+        }
+        if (normalizedEmail !== user.email) {
+            issues.push('EMAIL_NOT_TRIMMED');
+        }
+
+        if (issues.length > 0) {
+            records.push({
+                userId: toIdString(user._id),
+                issues
+            });
+        }
+
+        return records;
+    }, []);
+
+    return {
+        invalidCount: invalidRecords.length,
+        invalidRecords
+    };
+};
+
 const auditDataIntegrity = async ({ DebtModel, GroupModel, UserModel }) => {
     const [
         invalidDebts,
@@ -263,7 +322,16 @@ const auditDataIntegrity = async ({ DebtModel, GroupModel, UserModel }) => {
         DebtModel.aggregate(buildActiveBalancesPipeline()),
         UserModel.collection.find(
             {},
-            { projection: { _id: 1, owe: 1, owes: 1 } }
+            {
+                projection: {
+                    _id: 1,
+                    email: 1,
+                    name: 1,
+                    nickname: 1,
+                    owe: 1,
+                    owes: 1
+                }
+            }
         ).toArray()
     ]);
     const legacyUniqueGroupNameIndexes = (
@@ -278,6 +346,7 @@ const auditDataIntegrity = async ({ DebtModel, GroupModel, UserModel }) => {
             invalidRecords: invalidDebts
         },
         balances: auditStoredBalances(users, derivedBalances),
+        users: auditUserIdentities(users),
         groups: {
             legacyUniqueNameIndexCount: (
                 legacyUniqueGroupNameIndexes.length
@@ -290,6 +359,7 @@ const auditDataIntegrity = async ({ DebtModel, GroupModel, UserModel }) => {
 module.exports = {
     auditDataIntegrity,
     auditStoredBalances,
+    auditUserIdentities,
     buildActiveBalancesPipeline,
     buildDebtIntegrityPipeline,
     findLegacyUniqueGroupNameIndexes

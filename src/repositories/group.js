@@ -3,10 +3,30 @@ const {
     applyTransaction,
     buildWriteOptions
 } = require('./repositoryOptions');
+const { getPaginationOffset } = require('../helpers/pagination');
 
-const findAllActiveByUser = async (userId, options = {}) => (
+const activeByUserFilter = userId => ({
+    members: userId,
+    state: true
+});
+
+const countAllActiveByUser = async (userId, options = {}) => (
     applyTransaction(
-        Group.find({ members: userId, state: true }),
+        Group.countDocuments(activeByUserFilter(userId)),
+        options
+    )
+);
+
+const findAllActiveByUser = async (
+    userId,
+    { page, limit },
+    options = {}
+) => (
+    applyTransaction(
+        Group.find(activeByUserFilter(userId))
+            .sort({ _id: -1 })
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit),
         options
     )
 );
@@ -64,6 +84,7 @@ const addMemberById = async (groupId, userId, options = {}) => (
 
 module.exports = {
     addMemberById,
+    countAllActiveByUser,
     create,
     deactivateById,
     findActiveByCode,

@@ -4,12 +4,16 @@ const { allowOnlyFields } = require('../../src/middlewares/allowOnlyFields');
 const { validateForms } = require('../../src/middlewares/validate-forms');
 const { createDebtValidators } = require('../../src/validators/debtValidators');
 const {
+    createUserValidators,
     searchUsersValidators,
     userIdValidators
 } = require('../../src/validators/userValidators');
+const { loginValidators } = require('../../src/validators/authValidators');
 const {
     historyPaginationValidators,
-    searchPaginationValidators
+    listPaginationValidators,
+    searchPaginationValidators,
+    summaryPaginationValidators
 } = require('../../src/validators/paginationValidators');
 
 const runValidation = async (validators, requestData) => {
@@ -36,6 +40,70 @@ const runValidation = async (validators, requestData) => {
 };
 
 describe('validación y DTO de solicitud', () => {
+    it('normaliza espacios sin cambiar mayúsculas de identidad', async () => {
+        const result = await runValidation(createUserValidators, {
+            body: {
+                name: '  Laura   De León  ',
+                nickname: '  LEON  ',
+                email: '  lomasFresa@gmail.com  ',
+                password: '12345678'
+            }
+        });
+
+        assert.equal(result.nextCalled, true);
+        assert.deepEqual(result.req.validated.body, {
+            name: 'Laura De León',
+            nickname: 'LEON',
+            email: 'lomasFresa@gmail.com',
+            password: '12345678'
+        });
+    });
+
+    it('rechaza contraseñas nuevas de menos de ocho caracteres', async () => {
+        const result = await runValidation(createUserValidators, {
+            body: {
+                name: 'Laura',
+                nickname: 'Laura',
+                email: 'Laura@example.com',
+                password: '1234567'
+            }
+        });
+
+        assert.equal(result.nextCalled, false);
+        assert.equal(result.error.errorCode, 'VALIDATION_ERROR');
+        assert.equal(result.error.details[0].path, 'password');
+    });
+
+    it('acepta contraseñas largas sin reglas de composición', async () => {
+        const password = '1'.repeat(500);
+        const result = await runValidation(createUserValidators, {
+            body: {
+                name: 'Laura',
+                nickname: 'Laura',
+                email: 'Laura@example.com',
+                password
+            }
+        });
+
+        assert.equal(result.nextCalled, true);
+        assert.equal(result.req.validated.body.password, password);
+    });
+
+    it('no aplica el mínimo nuevo durante el login de cuentas antiguas', async () => {
+        const result = await runValidation(loginValidators, {
+            body: {
+                email: '  Laura@Example.com  ',
+                password: 'corta'
+            }
+        });
+
+        assert.equal(result.nextCalled, true);
+        assert.deepEqual(result.req.validated.body, {
+            email: 'Laura@Example.com',
+            password: 'corta'
+        });
+    });
+
     it('sanitiza una deuda válida y convierte value a número', async () => {
         const creditorId = '507f1f77bcf86cd799439011';
         const debtorId = '507f191e810c19729de860ea';
@@ -154,6 +222,25 @@ describe('validación y DTO de solicitud', () => {
             activePage: 1,
             paidPage: 1,
             limit: 20
+        });
+    });
+
+    it('valida páginas simples y páginas independientes del resumen', async () => {
+        const list = await runValidation(listPaginationValidators, {
+            query: { page: '2', limit: '10' }
+        });
+        const summary = await runValidation(summaryPaginationValidators, {
+            query: { debtsPage: '3', creditsPage: '2', limit: '5' }
+        });
+
+        assert.deepEqual(list.req.validated.query, {
+            page: 2,
+            limit: 10
+        });
+        assert.deepEqual(summary.req.validated.query, {
+            debtsPage: 3,
+            creditsPage: 2,
+            limit: 5
         });
     });
 

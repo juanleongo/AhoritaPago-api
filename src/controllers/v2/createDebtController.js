@@ -1,6 +1,10 @@
 const { asyncHandler } = require('../../middlewares/asyncHandler');
 const { createDebtDto, updateDebtDto } = require('../../dtos/debtDtos');
-const { historyPaginationDto } = require('../../dtos/paginationDtos');
+const {
+    historyPaginationDto,
+    listPaginationDto,
+    summaryPaginationDto
+} = require('../../dtos/paginationDtos');
 const {
     createSuccessResponse
 } = require('../../dtos/output/responseDto');
@@ -11,11 +15,17 @@ const {
 
 const createDebtControllerV2 = ({ debtService }) => {
     const getAllDebts = asyncHandler(async (req, res) => {
-        const debts = await debtService.getAllDebts(req.user.userId);
+        const result = await debtService.getAllDebts(
+            req.user.userId,
+            listPaginationDto(req.validated?.query)
+        );
 
         res.status(200).json(createSuccessResponse({
-            data: debts.map(debtResponseDto),
-            meta: { count: debts.length }
+            data: result.debts.map(debtResponseDto),
+            meta: {
+                count: result.count,
+                pagination: result.pagination
+            }
         }));
     });
 
@@ -82,11 +92,16 @@ const createDebtControllerV2 = ({ debtService }) => {
 
     const getDebtSummary = asyncHandler(async (req, res) => {
         const summary = await debtService.getDebtSummaryForUser(
-            req.user.userId
+            req.user.userId,
+            summaryPaginationDto(req.validated?.query)
         );
 
         res.status(200).json(createSuccessResponse({
-            data: debtSummaryDto(summary)
+            data: debtSummaryDto(summary),
+            meta: {
+                count: summary.count,
+                pagination: summary.pagination
+            }
         }));
     });
 
@@ -109,14 +124,18 @@ const createDebtControllerV2 = ({ debtService }) => {
     });
 
     const getDebtsInGroup = asyncHandler(async (req, res) => {
-        const debts = await debtService.getDebtsForUserInGroupByCode(
+        const result = await debtService.getDebtsForUserInGroupByCode(
             req.user.userId,
-            req.validated.params.groupCode
+            req.validated.params.groupCode,
+            listPaginationDto(req.validated?.query)
         );
 
         res.status(200).json(createSuccessResponse({
-            data: debts.map(debtResponseDto),
-            meta: { count: debts.length }
+            data: result.debts.map(debtResponseDto),
+            meta: {
+                count: result.count,
+                pagination: result.pagination
+            }
         }));
     });
 

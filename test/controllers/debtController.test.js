@@ -8,13 +8,18 @@ const { errorHandler } = require('../../src/middlewares/errorHandler');
 const createResponse = () => {
     const result = {
         statusCode: null,
-        body: null
+        body: null,
+        headers: {}
     };
 
     return {
         result,
         response: {
             headersSent: false,
+            set(headers) {
+                Object.assign(result.headers, headers);
+                return this;
+            },
             status(statusCode) {
                 result.statusCode = statusCode;
                 return this;
@@ -28,6 +33,43 @@ const createResponse = () => {
 };
 
 describe('debtController: historial', () => {
+    it('conserva el arreglo legacy y publica la paginación en headers', async () => {
+        const debts = [{ id: 'debt-1' }];
+        const controller = createDebtController({
+            debtService: {
+                async getAllDebts(userId, pagination) {
+                    assert.equal(userId, 'user-1');
+                    assert.deepEqual(pagination, { page: 2, limit: 5 });
+                    return {
+                        count: 12,
+                        pagination: {
+                            page: 2,
+                            limit: 5,
+                            totalPages: 3,
+                            hasNextPage: true,
+                            hasPreviousPage: true
+                        },
+                        debts
+                    };
+                }
+            }
+        });
+        const { result, response } = createResponse();
+
+        await controller.getAllDebts({
+            user: { userId: 'user-1' },
+            validated: { query: { page: 2, limit: 5 } }
+        }, response, error => { throw error; });
+
+        assert.deepEqual(result.body, debts);
+        assert.deepEqual(result.headers, {
+            'X-Limit': '5',
+            'X-Page': '2',
+            'X-Total-Count': '12',
+            'X-Total-Pages': '3'
+        });
+    });
+
     it('devuelve conteos y listas separadas en formato JSON', async () => {
         const controller = createDebtController({
             debtService: {

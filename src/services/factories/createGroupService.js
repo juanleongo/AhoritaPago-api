@@ -1,4 +1,6 @@
 const { createHttpError } = require('../../helpers/httpError');
+const { PAGINATION } = require('../../config/pagination');
+const { createPaginationMetadata } = require('../../helpers/pagination');
 
 const MAX_GROUP_CODE_ATTEMPTS = 5;
 
@@ -27,9 +29,20 @@ const createGroupService = ({
     userRepository,
     generateRandomCode
 }) => {
-    const getGroupsForUser = async userId => (
-        groupRepository.findAllActiveByUser(userId)
-    );
+    const getGroupsForUser = async (userId, pagination = {}) => {
+        const page = pagination.page ?? PAGINATION.defaultPage;
+        const limit = pagination.limit ?? PAGINATION.defaultLimit;
+        const [groups, count] = await Promise.all([
+            groupRepository.findAllActiveByUser(userId, { page, limit }),
+            groupRepository.countAllActiveByUser(userId)
+        ]);
+
+        return {
+            count,
+            pagination: createPaginationMetadata(count, page, limit),
+            groups
+        };
+    };
 
     const getGroupById = async (id, userId) => {
         const group = await groupRepository.findActiveById(id);

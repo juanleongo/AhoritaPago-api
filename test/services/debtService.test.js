@@ -58,6 +58,147 @@ const createService = transactionManager => createDebtService({
 });
 
 describe('debtService: historial y consistencia financiera', () => {
+    it('pagina el listado activo del usuario como deudor', async () => {
+        const calls = [];
+
+        await withStubs(
+            debtRepository,
+            {
+                findActiveByDebtor: async (userId, pagination) => {
+                    calls.push(['find', userId, pagination]);
+                    return [{ id: 'debt-1' }];
+                },
+                countActiveByDebtor: async userId => {
+                    calls.push(['count', userId]);
+                    return 7;
+                }
+            },
+            async () => {
+                const result = await debtService.getAllDebts(
+                    'user-1',
+                    { page: 2, limit: 3 }
+                );
+
+                assert.deepEqual(calls, [
+                    ['find', 'user-1', { page: 2, limit: 3 }],
+                    ['count', 'user-1']
+                ]);
+                assert.deepEqual(result, {
+                    count: 7,
+                    pagination: {
+                        page: 2,
+                        limit: 3,
+                        totalPages: 3,
+                        hasNextPage: true,
+                        hasPreviousPage: true
+                    },
+                    debts: [{ id: 'debt-1' }]
+                });
+            }
+        );
+    });
+
+    it('pagina deudas y créditos del resumen de forma independiente', async () => {
+        const calls = [];
+        const debt = {
+            description: 'Cena',
+            debtDate: new Date('2026-08-01'),
+            value: 30,
+            group: { name: 'Amigos' },
+            creditor: { name: 'Laura' },
+            debtor: [{ name: 'León' }]
+        };
+
+        await withStubs(
+            debtRepository,
+            {
+                findActiveByDebtor: async (userId, pagination) => {
+                    calls.push(['debts', userId, pagination]);
+                    return [debt];
+                },
+                findActiveByCreditor: async (userId, pagination) => {
+                    calls.push(['credits', userId, pagination]);
+                    return [debt];
+                },
+                countActiveByDebtor: async () => 5,
+                countActiveByCreditor: async () => 3
+            },
+            async () => {
+                const result = await debtService.getDebtSummaryForUser(
+                    'user-1',
+                    { debtsPage: 2, creditsPage: 1, limit: 2 }
+                );
+
+                assert.deepEqual(calls, [
+                    ['debts', 'user-1', { page: 2, limit: 2 }],
+                    ['credits', 'user-1', { page: 1, limit: 2 }]
+                ]);
+                assert.deepEqual(result.count, {
+                    total: 8,
+                    debts: 5,
+                    credits: 3
+                });
+                assert.equal(result.pagination.debts.page, 2);
+                assert.equal(result.pagination.credits.page, 1);
+                assert.equal(result.debts[0].with, 'Laura');
+                assert.equal(result.credits[0].with, 'León');
+            }
+        );
+    });
+
+    it('autoriza y pagina las deudas activas de un grupo', async () => {
+        const calls = [];
+
+        await withStubs(
+            groupRepository,
+            {
+                findActiveByCode: async code => ({
+                    _id: 'group-1',
+                    code,
+                    members: ['user-1']
+                })
+            },
+            async () => {
+                await withStubs(
+                    debtRepository,
+                    {
+                        findActiveByParticipantAndGroup: async (
+                            userId,
+                            groupId,
+                            pagination
+                        ) => {
+                            calls.push(['find', userId, groupId, pagination]);
+                            return [{ id: 'debt-1' }];
+                        },
+                        countActiveByParticipantAndGroup: async (
+                            userId,
+                            groupId
+                        ) => {
+                            calls.push(['count', userId, groupId]);
+                            return 4;
+                        }
+                    },
+                    async () => {
+                        const result = await debtService
+                            .getDebtsForUserInGroupByCode(
+                                'user-1',
+                                'ABC123',
+                                { page: 2, limit: 2 }
+                            );
+
+                        assert.equal(result.count, 4);
+                        assert.equal(result.pagination.page, 2);
+                    }
+                );
+            }
+        );
+
+        assert.deepEqual(calls, [
+            ['find', 'user-1', 'group-1', { page: 2, limit: 2 }],
+            ['count', 'user-1', 'group-1']
+        ]);
+    });
+
     it('consulta páginas separadas y devuelve totales del historial', async () => {
         const receivedQueries = [];
 

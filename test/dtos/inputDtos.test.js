@@ -14,6 +14,8 @@ const {
 } = require('../../src/dtos/userDtos');
 const {
     historyPaginationDto,
+    listPaginationDto,
+    summaryPaginationDto,
     searchPaginationDto
 } = require('../../src/dtos/paginationDtos');
 
@@ -116,6 +118,15 @@ describe('DTO de entrada', () => {
         assert.deepEqual(searchPaginationDto({ page: 2, limit: 10 }), {
             page: 2,
             limit: 10
+        });
+        assert.deepEqual(listPaginationDto({}), {
+            page: 1,
+            limit: 20
+        });
+        assert.deepEqual(summaryPaginationDto({ creditsPage: 3 }), {
+            debtsPage: 1,
+            creditsPage: 3,
+            limit: 20
         });
     });
 });

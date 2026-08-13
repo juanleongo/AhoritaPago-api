@@ -163,7 +163,13 @@ describe('contrato uniforme de controladores v2', () => {
                 async createGroup() { return group; },
                 async deleteGroup() {},
                 async getGroupById() { return group; },
-                async getGroupsForUser() { return [group]; },
+                async getGroupsForUser() {
+                    return {
+                        count: 1,
+                        pagination: { page: 1, limit: 20, totalPages: 1 },
+                        groups: [group]
+                    };
+                },
                 async updateGroup() { return group; }
             }
         });
@@ -216,7 +222,13 @@ describe('contrato uniforme de controladores v2', () => {
             debtService: {
                 async createDebt() { return [debt]; },
                 async deleteDebt() {},
-                async getAllDebts() { return [debt]; },
+                async getAllDebts() {
+                    return {
+                        count: 1,
+                        pagination: { page: 1, limit: 20, totalPages: 1 },
+                        debts: [debt]
+                    };
+                },
                 async getDebtById() { return debt; },
                 async getDebtHistoryForUser() {
                     return {
@@ -227,9 +239,20 @@ describe('contrato uniforme de controladores v2', () => {
                     };
                 },
                 async getDebtSummaryForUser() {
-                    return { debts: [], credits: [] };
+                    return {
+                        debts: [],
+                        credits: [],
+                        count: { total: 0, debts: 0, credits: 0 },
+                        pagination: { debts: {}, credits: {} }
+                    };
                 },
-                async getDebtsForUserInGroupByCode() { return [debt]; },
+                async getDebtsForUserInGroupByCode() {
+                    return {
+                        count: 1,
+                        pagination: { page: 1, limit: 20, totalPages: 1 },
+                        debts: [debt]
+                    };
+                },
                 async markAsPaid() { return { ...debt, state: false }; },
                 async updateDebt() { return debt; }
             }
@@ -273,6 +296,22 @@ describe('contrato uniforme de controladores v2', () => {
         );
         assert.deepEqual(Object.keys(history.body.data), ['active', 'paid']);
         assert.equal(history.body.meta.count.total, 1);
+        const activeDebts = await invoke(
+            controller.getAllDebts,
+            requests.getAllDebts
+        );
+        assert.equal(activeDebts.body.meta.count, 1);
+        assert.equal(activeDebts.body.meta.pagination.page, 1);
+        const summary = await invoke(
+            controller.getDebtSummary,
+            requests.getDebtSummary
+        );
+        assert.equal(summary.body.meta.count.total, 0);
+        const groupDebts = await invoke(
+            controller.getDebtsInGroup,
+            requests.getDebtsInGroup
+        );
+        assert.equal(groupDebts.body.meta.pagination.limit, 20);
         const deleted = await invoke(controller.deleteDebt, requests.deleteDebt);
         assert.equal(deleted.body.data, null);
     });

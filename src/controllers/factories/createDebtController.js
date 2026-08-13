@@ -1,11 +1,22 @@
 const { asyncHandler } = require('../../middlewares/asyncHandler');
 const { createDebtDto, updateDebtDto } = require('../../dtos/debtDtos');
-const { historyPaginationDto } = require('../../dtos/paginationDtos');
+const {
+    historyPaginationDto,
+    listPaginationDto,
+    summaryPaginationDto
+} = require('../../dtos/paginationDtos');
+const {
+    setPaginationHeaders
+} = require('../../helpers/paginationHeaders');
 
 const createDebtController = ({ debtService }) => {
     const getAllDebts = asyncHandler(async (req, res) => {
-        const debts = await debtService.getAllDebts(req.user.userId);
-        res.status(200).json(debts);
+        const result = await debtService.getAllDebts(
+            req.user.userId,
+            listPaginationDto(req.validated?.query)
+        );
+        setPaginationHeaders(res, result.count, result.pagination);
+        res.status(200).json(result.debts);
     });
 
     const getDebtById = asyncHandler(async (req, res) => {
@@ -57,12 +68,18 @@ const createDebtController = ({ debtService }) => {
 
     const getDebtSummary = asyncHandler(async (req, res) => {
         const summary = await debtService.getDebtSummaryForUser(
-            req.user.userId
+            req.user.userId,
+            summaryPaginationDto(req.validated?.query)
         );
 
         res.status(200).json({
             msg: 'Resumen financiero obtenido con éxito.',
-            summary
+            summary: {
+                debts: summary.debts,
+                credits: summary.credits
+            },
+            count: summary.count,
+            pagination: summary.pagination
         });
     });
 
@@ -77,15 +94,17 @@ const createDebtController = ({ debtService }) => {
 
     const getDebtsInGroup = asyncHandler(async (req, res) => {
         const { groupCode } = req.validated.params;
-        const debts = await debtService.getDebtsForUserInGroupByCode(
+        const result = await debtService.getDebtsForUserInGroupByCode(
             req.user.userId,
-            groupCode
+            groupCode,
+            listPaginationDto(req.validated?.query)
         );
 
         res.status(200).json({
             msg: `Deudas encontradas en el grupo ${groupCode}`,
-            count: debts.length,
-            debts
+            count: result.count,
+            pagination: result.pagination,
+            debts: result.debts
         });
     });
 

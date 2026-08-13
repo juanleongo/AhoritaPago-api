@@ -115,6 +115,132 @@ describe('userService: autorización y campos permitidos', () => {
         );
     });
 
+    it('rechaza una contraseña nueva de siete caracteres en el servicio', async () => {
+        await assert.rejects(
+            () => userService.createUser({
+                name: 'Usuario',
+                email: 'User@example.com',
+                nickname: 'Usuario',
+                password: '1234567'
+            }),
+            error => error.errorCode === 'USER_IDENTITY_INVALID'
+        );
+    });
+
+    it('preserva las mayúsculas de email y nickname al registrar', async () => {
+        let persistedData;
+
+        await withRepositoryStubs(
+            {
+                findByEmail: async () => null,
+                findByNickname: async () => null,
+                create: async data => {
+                    persistedData = data;
+                    return data;
+                }
+            },
+            () => userService.createUser({
+                name: '  Laura   Gómez  ',
+                email: '  lomasFresa@gmail.com  ',
+                nickname: '  LEON  ',
+                password: '12345678'
+            })
+        );
+
+        assert.equal(persistedData.name, 'Laura Gómez');
+        assert.equal(persistedData.email, 'lomasFresa@gmail.com');
+        assert.equal(persistedData.nickname, 'LEON');
+    });
+
+    it('permite actualizar a identidades que solo difieren por mayúsculas', async () => {
+        const lookups = [];
+        let persistedData;
+
+        await withRepositoryStubs(
+            {
+                findActiveById: async () => ({
+                    _id: 'user-1',
+                    email: 'lomasFresa@gmail.com',
+                    nickname: 'leon'
+                }),
+                findByEmail: async email => {
+                    lookups.push(['email', email]);
+                    return null;
+                },
+                findByNickname: async nickname => {
+                    lookups.push(['nickname', nickname]);
+                    return null;
+                },
+                updateById: async (id, data) => {
+                    persistedData = { id, data };
+                    return { _id: id, ...data };
+                }
+            },
+            () => userService.updateUser(
+                'user-1',
+                {
+                    email: '  lomasfresa@gmail.com  ',
+                    nickname: '  LEON  '
+                },
+                'user-1'
+            )
+        );
+
+        assert.deepEqual(lookups, [
+            ['email', 'lomasfresa@gmail.com'],
+            ['nickname', 'LEON']
+        ]);
+        assert.deepEqual(persistedData, {
+            id: 'user-1',
+            data: {
+                email: 'lomasfresa@gmail.com',
+                nickname: 'LEON'
+            }
+        });
+    });
+
+    it('rechaza conflictos exactos al actualizar email o nickname', async () => {
+        const existingUser = {
+            _id: 'user-1',
+            email: 'old@example.com',
+            nickname: 'oldNick'
+        };
+
+        await withRepositoryStubs(
+            {
+                findActiveById: async () => existingUser,
+                findByEmail: async () => ({ _id: 'user-2' })
+            },
+            async () => {
+                await assert.rejects(
+                    () => userService.updateUser(
+                        'user-1',
+                        { email: 'used@example.com' },
+                        'user-1'
+                    ),
+                    error => error.errorCode === 'EMAIL_ALREADY_IN_USE'
+                );
+            }
+        );
+
+        await withRepositoryStubs(
+            {
+                findActiveById: async () => existingUser,
+                findByNickname: async () => ({ _id: 'user-2' })
+            },
+            async () => {
+                await assert.rejects(
+                    () => userService.updateUser(
+                        'user-1',
+                        { nickname: 'usedNick' },
+                        'user-1'
+                    ),
+                    error => error.errorCode === 'NICKNAME_ALREADY_IN_USE'
+                );
+            }
+        );
+    });
+
     it('impide consultar el perfil de otro usuario', async () => {
         await assert.rejects(
             () => userService.getUserById('user-2', 'user-1'),

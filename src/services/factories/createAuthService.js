@@ -1,4 +1,5 @@
 const { createHttpError } = require('../../helpers/httpError');
+const { normalizeEmail } = require('../../config/userIdentity');
 
 const createAuthService = ({
     userRepository,
@@ -7,7 +8,7 @@ const createAuthService = ({
     getJwtSecret
 }) => {
     const login = async (email, password) => {
-        const user = await userRepository.findByEmail(email);
+        const user = await userRepository.findByEmail(normalizeEmail(email));
         if (!user) {
             throw createHttpError(
                 401,

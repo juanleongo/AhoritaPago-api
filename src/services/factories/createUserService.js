@@ -1,10 +1,65 @@
 const { createHttpError } = require('../../helpers/httpError');
 const { PAGINATION } = require('../../config/pagination');
 const { createPaginationMetadata } = require('../../helpers/pagination');
+const {
+    USER_IDENTITY_LIMITS,
+    hasIdentityLength,
+    isValidEmail,
+    normalizeEmail,
+    normalizeName,
+    normalizeNickname
+} = require('../../config/userIdentity');
 
 const isSameUser = (userId, authenticatedUserId) => (
     userId.toString() === authenticatedUserId.toString()
 );
+
+const validateIdentityData = (userData, { includePassword = false } = {}) => {
+    const issues = [];
+
+    if (
+        Object.prototype.hasOwnProperty.call(userData, 'name')
+        && !hasIdentityLength(userData.name, USER_IDENTITY_LIMITS.name)
+    ) {
+        issues.push({ path: 'name', message: 'El nombre no tiene una longitud válida.' });
+    }
+    if (
+        Object.prototype.hasOwnProperty.call(userData, 'nickname')
+        && !hasIdentityLength(userData.nickname, USER_IDENTITY_LIMITS.nickname)
+    ) {
+        issues.push({
+            path: 'nickname',
+            message: 'El nickname no tiene una longitud válida.'
+        });
+    }
+    if (
+        Object.prototype.hasOwnProperty.call(userData, 'email')
+        && (
+            !hasIdentityLength(userData.email, USER_IDENTITY_LIMITS.email)
+            || !isValidEmail(userData.email)
+        )
+    ) {
+        issues.push({ path: 'email', message: 'El correo no es válido.' });
+    }
+    if (
+        includePassword
+        && !hasIdentityLength(userData.password, USER_IDENTITY_LIMITS.password)
+    ) {
+        issues.push({
+            path: 'password',
+            message: `La contraseña debe tener al menos ${USER_IDENTITY_LIMITS.password.minLength} caracteres.`
+        });
+    }
+
+    if (issues.length > 0) {
+        throw createHttpError(
+            400,
+            'Los datos de identidad no son válidos.',
+            'USER_IDENTITY_INVALID',
+            issues
+        );
+    }
+};
 
 const createUserService = ({
     balanceService,
@@ -35,7 +90,10 @@ const createUserService = ({
     };
 
     const getByNickname = async nickname => {
-        const user = await userRepository.findActiveByNickname(nickname);
+        const normalizedNickname = normalizeNickname(nickname);
+        const user = await userRepository.findActiveByNickname(
+            normalizedNickname
+        );
         if (!user) {
             throw createHttpError(
                 404,
@@ -48,7 +106,9 @@ const createUserService = ({
     };
 
     const searchUsersByNickname = async (searchTerm, pagination = {}) => {
-        if (!searchTerm || searchTerm.trim().length < 2) {
+        const normalizedSearchTerm = normalizeNickname(searchTerm);
+
+        if (!normalizedSearchTerm || normalizedSearchTerm.length < 2) {
             throw createHttpError(
                 400,
                 'El término de búsqueda debe tener al menos 2 caracteres.',
@@ -60,10 +120,10 @@ const createUserService = ({
         const limit = pagination.limit ?? PAGINATION.defaultLimit;
         const [results, count] = await Promise.all([
             userRepository.searchActiveByNickname(
-                searchTerm,
+                normalizedSearchTerm,
                 { page, limit }
             ),
-            userRepository.countActiveByNickname(searchTerm)
+            userRepository.countActiveByNickname(normalizedSearchTerm)
         ]);
 
         return {
@@ -87,7 +147,13 @@ const createUserService = ({
     };
 
     const createUser = async userData => {
-        const { name, email, nickname, password } = userData;
+        const normalizedUserData = {
+            name: normalizeName(userData.name),
+            email: normalizeEmail(userData.email),
+            nickname: normalizeNickname(userData.nickname),
+            password: userData.password
+        };
+        const { name, email, nickname, password } = normalizedUserData;
 
         if (!name || !email || !nickname || !password) {
             throw createHttpError(
@@ -96,6 +162,7 @@ const createUserService = ({
                 'USER_REQUIRED_FIELDS_MISSING'
             );
         }
+        validateIdentityData(normalizedUserData, { includePassword: true });
 
         const existingEmail = await userRepository.findByEmail(email);
         if (existingEmail) {
@@ -149,7 +216,12 @@ const createUserService = ({
         const allowedData = {};
         ['name', 'nickname', 'email'].forEach(field => {
             if (Object.prototype.hasOwnProperty.call(userData, field)) {
-                allowedData[field] = userData[field];
+                const normalizers = {
+                    email: normalizeEmail,
+                    name: normalizeName,
+                    nickname: normalizeNickname
+                };
+                allowedData[field] = normalizers[field](userData[field]);
             }
         });
 
@@ -159,6 +231,39 @@ const createUserService = ({
                 'No se enviaron campos permitidos para actualizar',
                 'USER_UPDATE_FIELDS_INVALID'
             );
+        }
+        validateIdentityData(allowedData);
+
+        if (
+            Object.prototype.hasOwnProperty.call(allowedData, 'email')
+            && allowedData.email !== existingUser.email
+        ) {
+            const emailUser = await userRepository.findByEmail(
+                allowedData.email
+            );
+            if (emailUser && !isSameUser(emailUser._id, id)) {
+                throw createHttpError(
+                    409,
+                    'El correo electrónico ya está en uso',
+                    'EMAIL_ALREADY_IN_USE'
+                );
+            }
+        }
+
+        if (
+            Object.prototype.hasOwnProperty.call(allowedData, 'nickname')
+            && allowedData.nickname !== existingUser.nickname
+        ) {
+            const nicknameUser = await userRepository.findByNickname(
+                allowedData.nickname
+            );
+            if (nicknameUser && !isSameUser(nicknameUser._id, id)) {
+                throw createHttpError(
+                    409,
+                    'El nombre de usuario ya está en uso',
+                    'NICKNAME_ALREADY_IN_USE'
+                );
+            }
         }
 
         const updatedUser = await userRepository.updateById(id, allowedData);

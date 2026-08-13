@@ -14,6 +14,27 @@ const historyFilter = (userId, state) => ({
     ]
 });
 
+const activeDebtorFilter = userId => ({
+    debtor: userId,
+    state: true
+});
+
+const activeCreditorFilter = userId => ({
+    creditor: userId,
+    state: true
+});
+
+const activeParticipantAndGroupFilter = (userId, groupId) => ({
+    group: groupId,
+    state: true,
+    $or: [
+        { creditor: userId },
+        { debtor: userId }
+    ]
+});
+
+const activeDebtSort = { debtDate: -1, _id: -1 };
+
 const historySort = state => (
     state
         ? { debtDate: -1, _id: -1 }
@@ -120,27 +141,63 @@ const getActiveBalanceByUserId = async (userId, options = {}) => {
     };
 };
 
-const findActiveByDebtor = async (userId, options = {}) => (
+const countActiveByCreditor = async (userId, options = {}) => (
     applyTransaction(
-        Debt.find({ debtor: userId, state: true })
-            .populate('debtor', 'name')
-            .populate('creditor', 'name'),
+        Debt.countDocuments(activeCreditorFilter(userId)),
         options
     )
 );
 
-const findActiveByParticipant = async (userId, options = {}) => (
+const countActiveByDebtor = async (userId, options = {}) => (
     applyTransaction(
-        Debt.find({
-            $or: [
-                { creditor: userId },
-                { debtor: userId }
-            ],
-            state: true
-        })
-            .populate('group', 'name')
-            .populate('creditor', 'name nickname')
-            .populate('debtor', 'name nickname'),
+        Debt.countDocuments(activeDebtorFilter(userId)),
+        options
+    )
+);
+
+const countActiveByParticipantAndGroup = async (
+    userId,
+    groupId,
+    options = {}
+) => (
+    applyTransaction(
+        Debt.countDocuments(
+            activeParticipantAndGroupFilter(userId, groupId)
+        ),
+        options
+    )
+);
+
+const findActiveByCreditor = async (
+    userId,
+    { page, limit },
+    options = {}
+) => (
+    applyTransaction(
+        Debt.find(activeCreditorFilter(userId))
+            .sort(activeDebtSort)
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit)
+            .populate('group', 'name code')
+            .populate('debtor', 'name nickname')
+            .populate('creditor', 'name nickname'),
+        options
+    )
+);
+
+const findActiveByDebtor = async (
+    userId,
+    { page, limit },
+    options = {}
+) => (
+    applyTransaction(
+        Debt.find(activeDebtorFilter(userId))
+            .sort(activeDebtSort)
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit)
+            .populate('group', 'name code')
+            .populate('debtor', 'name nickname')
+            .populate('creditor', 'name nickname'),
         options
     )
 );
@@ -176,17 +233,15 @@ const findHistoryByParticipant = async (
 const findActiveByParticipantAndGroup = async (
     userId,
     groupId,
+    { page, limit },
     options = {}
 ) => (
     applyTransaction(
-        Debt.find({
-            group: groupId,
-            state: true,
-            $or: [
-                { creditor: userId },
-                { debtor: userId }
-            ]
-        })
+        Debt.find(activeParticipantAndGroupFilter(userId, groupId))
+            .sort(activeDebtSort)
+            .skip(getPaginationOffset(page, limit))
+            .limit(limit)
+            .populate('group', 'name code')
             .populate('creditor', 'name nickname')
             .populate('debtor', 'name nickname'),
         options
@@ -194,12 +249,15 @@ const findActiveByParticipantAndGroup = async (
 );
 
 module.exports = {
+    countActiveByCreditor,
+    countActiveByDebtor,
+    countActiveByParticipantAndGroup,
     countHistoryByParticipant,
     create,
     deleteById,
     existsActiveByParticipant,
+    findActiveByCreditor,
     findActiveByDebtor,
-    findActiveByParticipant,
     findActiveByParticipantAndGroup,
     findById,
     findHistoryByParticipant,

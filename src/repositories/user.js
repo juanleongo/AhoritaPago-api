@@ -5,9 +5,13 @@ const {
     buildWriteOptions
 } = require('./repositoryOptions');
 const { getPaginationOffset } = require('../helpers/pagination');
+const {
+    normalizeEmail,
+    normalizeNickname
+} = require('../config/userIdentity');
 
 const activeNicknameFilter = searchTerm => ({
-    nickname: new RegExp(escapeRegex(searchTerm), 'i'),
+    nickname: new RegExp(escapeRegex(normalizeNickname(searchTerm)), 'i'),
     state: true
 });
 
@@ -23,19 +27,27 @@ const findActiveById = async (id, options = {}) => (
 );
 
 const findByEmail = async (email, options = {}) => (
-    applyTransaction(User.findOne({ email }), options)
+    applyTransaction(
+        User.findOne({ email: normalizeEmail(email) }),
+        options
+    )
 );
 
 const findByNickname = async (nickname, options = {}) => (
     applyTransaction(
-        User.findOne({ nickname }).select('nickname name'),
+        User.findOne({
+            nickname: normalizeNickname(nickname)
+        }).select('nickname name'),
         options
     )
 );
 
 const findActiveByNickname = async (nickname, options = {}) => (
     applyTransaction(
-        User.findOne({ nickname, state: true }).select('nickname name'),
+        User.findOne({
+            nickname: normalizeNickname(nickname),
+            state: true
+        }).select('nickname name'),
         options
     )
 );

@@ -38,6 +38,7 @@ describe('contratos de repositorios', () => {
     it('expone un contrato uniforme para grupos', () => {
         assertContract(groupRepository, [
             'addMemberById',
+            'countAllActiveByUser',
             'create',
             'deactivateById',
             'findActiveByCode',
@@ -51,12 +52,15 @@ describe('contratos de repositorios', () => {
 
     it('expone un contrato uniforme para deudas', () => {
         assertContract(debtRepository, [
+            'countActiveByCreditor',
+            'countActiveByDebtor',
+            'countActiveByParticipantAndGroup',
             'countHistoryByParticipant',
             'create',
             'deleteById',
             'existsActiveByParticipant',
+            'findActiveByCreditor',
             'findActiveByDebtor',
-            'findActiveByParticipant',
             'findActiveByParticipantAndGroup',
             'findById',
             'findHistoryByParticipant',
@@ -128,6 +132,35 @@ describe('contratos de repositorios', () => {
         });
     });
 
+    it('busca email y nickname con coincidencia exacta de mayúsculas', async () => {
+        const originalFindOne = User.findOne;
+        const receivedFilters = [];
+        const query = {
+            select() {
+                return this;
+            }
+        };
+
+        User.findOne = filter => {
+            receivedFilters.push(filter);
+            return query;
+        };
+
+        try {
+            await userRepository.findByEmail('  lomasFresa@gmail.com  ');
+            await userRepository.findByNickname('  LEON  ');
+            await userRepository.findActiveByNickname('  leon  ');
+        } finally {
+            User.findOne = originalFindOne;
+        }
+
+        assert.deepEqual(receivedFilters, [
+            { email: 'lomasFresa@gmail.com' },
+            { nickname: 'LEON' },
+            { nickname: 'leon', state: true }
+        ]);
+    });
+
     it('cuenta usuarios con el mismo filtro de búsqueda activa', async () => {
         const originalCountDocuments = User.countDocuments;
         let receivedFilter;
@@ -149,6 +182,200 @@ describe('contratos de repositorios', () => {
         assert.equal(receivedFilter.state, true);
         assert.ok(receivedFilter.nickname instanceof RegExp);
         assert.equal(receivedFilter.nickname.test('Diana'), true);
+    });
+
+    it('pagina y ordena deudas activas por deudor', async () => {
+        const originalFind = Debt.find;
+        const operations = [];
+        let receivedFilter;
+        const query = {
+            sort(value) { operations.push(['sort', value]); return this; },
+            skip(value) { operations.push(['skip', value]); return this; },
+            limit(value) { operations.push(['limit', value]); return this; },
+            populate() { return this; }
+        };
+
+        Debt.find = filter => {
+            receivedFilter = filter;
+            return query;
+        };
+
+        try {
+            await debtRepository.findActiveByDebtor(
+                'user-1',
+                { page: 3, limit: 10 }
+            );
+        } finally {
+            Debt.find = originalFind;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            debtor: 'user-1',
+            state: true
+        });
+        assert.deepEqual(operations, [
+            ['sort', { debtDate: -1, _id: -1 }],
+            ['skip', 20],
+            ['limit', 10]
+        ]);
+    });
+
+    it('pagina deudas activas por acreedor', async () => {
+        const originalFind = Debt.find;
+        let receivedFilter;
+        const operations = [];
+        const query = {
+            sort(value) { operations.push(['sort', value]); return this; },
+            skip(value) { operations.push(['skip', value]); return this; },
+            limit(value) { operations.push(['limit', value]); return this; },
+            populate() { return this; }
+        };
+
+        Debt.find = filter => {
+            receivedFilter = filter;
+            return query;
+        };
+
+        try {
+            await debtRepository.findActiveByCreditor(
+                'user-1',
+                { page: 2, limit: 5 }
+            );
+        } finally {
+            Debt.find = originalFind;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            creditor: 'user-1',
+            state: true
+        });
+        assert.deepEqual(operations, [
+            ['sort', { debtDate: -1, _id: -1 }],
+            ['skip', 5],
+            ['limit', 5]
+        ]);
+    });
+
+    it('pagina deudas del participante dentro del grupo', async () => {
+        const originalFind = Debt.find;
+        let receivedFilter;
+        const operations = [];
+        const query = {
+            sort(value) { operations.push(['sort', value]); return this; },
+            skip(value) { operations.push(['skip', value]); return this; },
+            limit(value) { operations.push(['limit', value]); return this; },
+            populate() { return this; }
+        };
+
+        Debt.find = filter => {
+            receivedFilter = filter;
+            return query;
+        };
+
+        try {
+            await debtRepository.findActiveByParticipantAndGroup(
+                'user-1',
+                'group-1',
+                { page: 2, limit: 4 }
+            );
+        } finally {
+            Debt.find = originalFind;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            group: 'group-1',
+            state: true,
+            $or: [
+                { creditor: 'user-1' },
+                { debtor: 'user-1' }
+            ]
+        });
+        assert.deepEqual(operations, [
+            ['sort', { debtDate: -1, _id: -1 }],
+            ['skip', 4],
+            ['limit', 4]
+        ]);
+    });
+
+    it('pagina y ordena grupos activos del usuario', async () => {
+        const originalFind = Group.find;
+        let receivedFilter;
+        const operations = [];
+        const query = {
+            sort(value) { operations.push(['sort', value]); return this; },
+            skip(value) { operations.push(['skip', value]); return this; },
+            limit(value) { operations.push(['limit', value]); return this; }
+        };
+
+        Group.find = filter => {
+            receivedFilter = filter;
+            return query;
+        };
+
+        try {
+            await groupRepository.findAllActiveByUser(
+                'user-1',
+                { page: 2, limit: 6 }
+            );
+        } finally {
+            Group.find = originalFind;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            members: 'user-1',
+            state: true
+        });
+        assert.deepEqual(operations, [
+            ['sort', { _id: -1 }],
+            ['skip', 6],
+            ['limit', 6]
+        ]);
+    });
+
+    it('cuenta listados activos con los mismos filtros paginados', async () => {
+        const originalDebtCount = Debt.countDocuments;
+        const originalGroupCount = Group.countDocuments;
+        const debtFilters = [];
+        let groupFilter;
+
+        Debt.countDocuments = filter => {
+            debtFilters.push(filter);
+            return 1;
+        };
+        Group.countDocuments = filter => {
+            groupFilter = filter;
+            return 1;
+        };
+
+        try {
+            await debtRepository.countActiveByDebtor('user-1');
+            await debtRepository.countActiveByCreditor('user-1');
+            await debtRepository.countActiveByParticipantAndGroup(
+                'user-1',
+                'group-1'
+            );
+            await groupRepository.countAllActiveByUser('user-1');
+        } finally {
+            Debt.countDocuments = originalDebtCount;
+            Group.countDocuments = originalGroupCount;
+        }
+
+        assert.deepEqual(debtFilters, [
+            { debtor: 'user-1', state: true },
+            { creditor: 'user-1', state: true },
+            {
+                group: 'group-1',
+                state: true,
+                $or: [
+                    { creditor: 'user-1' },
+                    { debtor: 'user-1' }
+                ]
+            }
+        ]);
+        assert.deepEqual(groupFilter, {
+            members: 'user-1',
+            state: true
+        });
     });
 
     it('pagina y ordena el historial en MongoDB según su estado', async () => {

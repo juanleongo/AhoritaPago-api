@@ -9,6 +9,9 @@ const {
     groupIdValidators,
     updateGroupValidators
 } = require('../../validators/groupValidators');
+const {
+    listPaginationValidators
+} = require('../../validators/paginationValidators');
 
 const createGroupRouter = ({
     authVerify,
@@ -19,13 +22,20 @@ const createGroupRouter = ({
 
     router.use(authVerify);
 
+    const listGroupsMiddleware = [
+        allowOnlyFields(['page', 'limit'], 'query'),
+        ...listPaginationValidators,
+        validateForms
+    ];
+
     if (includeDeprecatedAliases) {
         router.get(
             '/mygroups',
+            listGroupsMiddleware,
             groupController.getGroupsForUser
         );
     }
-    router.get('/', groupController.getGroupsForUser);
+    router.get('/', listGroupsMiddleware, groupController.getGroupsForUser);
     router.get('/:id', [
         ...groupIdValidators,
         validateForms

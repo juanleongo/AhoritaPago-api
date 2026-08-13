@@ -5,6 +5,7 @@ const { createHttpError } = require('../../src/helpers/httpError');
 const { asyncHandler } = require('../../src/middlewares/asyncHandler');
 const {
     errorHandler,
+    normalizeError,
     notFoundHandler
 } = require('../../src/middlewares/errorHandler');
 const { validateForms } = require('../../src/middlewares/validate-forms');
@@ -38,6 +39,25 @@ const executeErrorHandler = (error) => {
 };
 
 describe('manejo centralizado de errores', () => {
+    it('identifica el campo de una colisión única concurrente', () => {
+        const emailError = normalizeError({
+            code: 11000,
+            keyPattern: { email: 1 }
+        });
+        const nicknameError = normalizeError({
+            code: 11000,
+            keyValue: { nickname: 'LEON' }
+        });
+
+        assert.equal(emailError.statusCode, 409);
+        assert.equal(emailError.errorCode, 'EMAIL_ALREADY_IN_USE');
+        assert.equal(nicknameError.statusCode, 409);
+        assert.equal(
+            nicknameError.errorCode,
+            'NICKNAME_ALREADY_IN_USE'
+        );
+    });
+
     it('devuelve el contrato uniforme para errores de negocio', () => {
         const result = executeErrorHandler(createHttpError(
             404,

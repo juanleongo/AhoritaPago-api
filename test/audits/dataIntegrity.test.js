@@ -2,12 +2,45 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const {
     auditDataIntegrity,
+    auditUserIdentities,
     buildActiveBalancesPipeline,
     buildDebtIntegrityPipeline,
     findLegacyUniqueGroupNameIndexes
 } = require('../../src/audits/dataIntegrity');
 
 describe('auditoría de integridad de datos', () => {
+    it('audita límites sin confundir identidades por mayúsculas', () => {
+        const report = auditUserIdentities([
+            {
+                _id: 'user-1',
+                name: 'Laura',
+                nickname: 'leon',
+                email: 'lomasFresa@gmail.com'
+            },
+            {
+                _id: 'user-2',
+                name: 'Lorenzo',
+                nickname: 'LEON',
+                email: 'lomasfresa@gmail.com'
+            },
+            {
+                _id: 'user-3',
+                name: ' A ',
+                nickname: 'b'.repeat(51),
+                email: 'correo-invalido'
+            }
+        ]);
+
+        assert.equal(report.invalidCount, 1);
+        assert.equal(report.invalidRecords[0].userId, 'user-3');
+        assert.deepEqual(report.invalidRecords[0].issues, [
+            'NAME_LENGTH_INVALID',
+            'NAME_NOT_NORMALIZED',
+            'NICKNAME_LENGTH_INVALID',
+            'EMAIL_FORMAT_INVALID'
+        ]);
+    });
+
     it('incluye todas las reglas de deuda en la consulta', () => {
         const pipeline = JSON.stringify(buildDebtIntegrityPipeline());
 
@@ -83,6 +116,9 @@ describe('auditoría de integridad de datos', () => {
                             async toArray() {
                                 return [{
                                     _id: 'user-1',
+                                    email: 'user@example.com',
+                                    name: 'Usuario',
+                                    nickname: 'usuario',
                                     owe: 10,
                                     owes: 50
                                 }];
@@ -106,6 +142,7 @@ describe('auditoría de integridad de datos', () => {
         assert.equal(report.debts.invalidRecords, invalidDebts);
         assert.equal(report.balances.legacyFieldCount, 1);
         assert.equal(report.balances.mismatchCount, 1);
+        assert.equal(report.users.invalidCount, 0);
         assert.deepEqual(report.balances.mismatches[0], {
             userId: 'user-1',
             stored: { owe: 10, owes: 50 },

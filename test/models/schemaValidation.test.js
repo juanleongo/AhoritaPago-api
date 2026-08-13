@@ -22,6 +22,54 @@ const buildDebt = changes => new Debt({
 const rejectsPath = path => error => Boolean(error.errors?.[path]);
 
 describe('integridad de los esquemas Mongoose', () => {
+    it('preserva mayúsculas de email y nickname al validar usuarios', async () => {
+        const user = new User({
+            name: '  Laura   Gómez  ',
+            nickname: '  LEON  ',
+            email: '  lomasFresa@gmail.com  ',
+            password: 'hash'
+        });
+
+        await user.validate();
+
+        assert.equal(user.name, 'Laura Gómez');
+        assert.equal(user.nickname, 'LEON');
+        assert.equal(user.email, 'lomasFresa@gmail.com');
+    });
+
+    it('limita la longitud de los datos de identidad', async () => {
+        const user = new User({
+            name: 'a'.repeat(81),
+            nickname: 'b'.repeat(51),
+            email: `${'c'.repeat(250)}@x.io`,
+            password: 'hash'
+        });
+
+        await assert.rejects(
+            () => user.validate(),
+            error => (
+                Boolean(error.errors?.name)
+                && Boolean(error.errors?.nickname)
+                && Boolean(error.errors?.email)
+            )
+        );
+    });
+
+    it('mantiene índices únicos sensibles a mayúsculas', () => {
+        const identityIndexes = User.schema.indexes().filter(
+            ([fields, options]) => (
+                options.unique === true
+                && (fields.email === 1 || fields.nickname === 1)
+            )
+        );
+
+        assert.equal(identityIndexes.length, 2);
+        identityIndexes.forEach(([, options]) => {
+            assert.equal(options.unique, true);
+            assert.equal(options.collation, undefined);
+        });
+    });
+
     it('acepta una deuda válida y normaliza su descripción', async () => {
         const debt = buildDebt();
 
@@ -144,6 +192,35 @@ describe('integridad de los esquemas Mongoose', () => {
             indexes.get('debt_group_state_debtor'),
             { group: 1, state: 1, debtor: 1 }
         );
+        assert.deepEqual(
+            indexes.get('debt_group_creditor_active_page'),
+            {
+                group: 1,
+                state: 1,
+                creditor: 1,
+                debtDate: -1,
+                _id: -1
+            }
+        );
+        assert.deepEqual(
+            indexes.get('debt_group_debtor_active_page'),
+            {
+                group: 1,
+                state: 1,
+                debtor: 1,
+                debtDate: -1,
+                _id: -1
+            }
+        );
+    });
+
+    it('declara un índice para grupos activos paginados por integrante', () => {
+        const index = Group.schema.indexes().find(
+            ([, options]) => options.name === 'group_member_active_page'
+        );
+
+        assert.ok(index);
+        assert.deepEqual(index[0], { members: 1, state: 1, _id: -1 });
     });
 
     it('declara un índice para búsqueda y orden de nicknames activos', () => {

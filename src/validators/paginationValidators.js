@@ -25,6 +25,17 @@ const historyPaginationValidators = [
     limitQuery()
 ];
 
+const listPaginationValidators = [
+    pageQuery('page'),
+    limitQuery()
+];
+
+const summaryPaginationValidators = [
+    pageQuery('debtsPage'),
+    pageQuery('creditsPage'),
+    limitQuery()
+];
+
 const searchPaginationValidators = [
     pageQuery('page'),
     limitQuery()
@@ -32,5 +43,7 @@ const searchPaginationValidators = [
 
 module.exports = {
     historyPaginationValidators,
+    listPaginationValidators,
+    summaryPaginationValidators,
     searchPaginationValidators
 };

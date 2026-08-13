@@ -126,7 +126,7 @@ test('activa encabezados defensivos y CORS para el frontend local', async () => 
         );
         assert.equal(
             response.headers.get('access-control-expose-headers'),
-            'Deprecation,Link,Sunset'
+            'Deprecation,Link,Sunset,X-Limit,X-Page,X-Total-Count,X-Total-Pages'
         );
     });
 });

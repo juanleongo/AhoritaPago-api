@@ -26,4 +26,9 @@ const GroupSchema = new Schema({
     }
 });
 
+GroupSchema.index(
+    { members: 1, state: 1, _id: -1 },
+    { name: 'group_member_active_page' }
+);
+
 module.exports = model('Group', GroupSchema);

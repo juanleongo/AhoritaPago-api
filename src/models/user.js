@@ -1,18 +1,53 @@
 const { Schema,model}= require('mongoose')
+const {
+    USER_IDENTITY_LIMITS,
+    hasIdentityLength,
+    isValidEmail,
+    normalizeEmail,
+    normalizeName,
+    normalizeNickname
+} = require('../config/userIdentity');
 
 const UserSchema = Schema({
     name:{
         type:String,
-        required: [true,'no envio el nombre']
+        required: [true,'no envio el nombre'],
+        set: normalizeName,
+        validate: [
+            value => hasIdentityLength(value, USER_IDENTITY_LIMITS.name),
+            'El nombre debe tener entre 2 y 80 caracteres'
+        ]
     },
     nickname: {
         type: String,
         required: [true, 'El nickname es obligatorio'],
+        set: normalizeNickname,
+        validate: [
+            value => hasIdentityLength(
+                value,
+                USER_IDENTITY_LIMITS.nickname
+            ),
+            'El nickname debe tener entre 1 y 50 caracteres'
+        ],
         unique: true 
     },
     email:{
         type:String,
         required: [true,'no envio el correo'],
+        set: normalizeEmail,
+        validate: [
+            {
+                validator: value => hasIdentityLength(
+                    value,
+                    USER_IDENTITY_LIMITS.email
+                ),
+                message: 'El correo es demasiado largo'
+            },
+            {
+                validator: isValidEmail,
+                message: 'El correo no tiene un formato válido'
+            }
+        ],
         unique: true
     },
 

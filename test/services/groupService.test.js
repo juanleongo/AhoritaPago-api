@@ -38,6 +38,46 @@ const buildGroup = () => ({
 });
 
 describe('groupService: membresía y administración', () => {
+    it('pagina y cuenta los grupos activos del usuario', async () => {
+        const calls = [];
+
+        await withStubs(
+            groupRepository,
+            {
+                findAllActiveByUser: async (userId, pagination) => {
+                    calls.push(['find', userId, pagination]);
+                    return [{ _id: 'group-1' }];
+                },
+                countAllActiveByUser: async userId => {
+                    calls.push(['count', userId]);
+                    return 6;
+                }
+            },
+            async () => {
+                const result = await groupService.getGroupsForUser(
+                    'user-1',
+                    { page: 2, limit: 4 }
+                );
+
+                assert.deepEqual(calls, [
+                    ['find', 'user-1', { page: 2, limit: 4 }],
+                    ['count', 'user-1']
+                ]);
+                assert.deepEqual(result, {
+                    count: 6,
+                    pagination: {
+                        page: 2,
+                        limit: 4,
+                        totalPages: 2,
+                        hasNextPage: false,
+                        hasPreviousPage: true
+                    },
+                    groups: [{ _id: 'group-1' }]
+                });
+            }
+        );
+    });
+
     it('permite consultar un grupo a sus integrantes', async () => {
         await withStubs(
             groupRepository,

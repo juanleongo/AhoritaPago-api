@@ -56,6 +56,26 @@ const normalizeError = (error) => {
     }
 
     if (error?.code === 11000) {
+        const duplicateFields = Object.keys(
+            error.keyPattern || error.keyValue || {}
+        );
+
+        if (duplicateFields.includes('email')) {
+            return createHttpError(
+                409,
+                'El correo electrónico ya está en uso',
+                'EMAIL_ALREADY_IN_USE'
+            );
+        }
+
+        if (duplicateFields.includes('nickname')) {
+            return createHttpError(
+                409,
+                'El nombre de usuario ya está en uso',
+                'NICKNAME_ALREADY_IN_USE'
+            );
+        }
+
         return createHttpError(
             409,
             'Ya existe un registro con esos datos.',

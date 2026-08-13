@@ -4,11 +4,19 @@ const {
     createGroupDto,
     updateGroupDto
 } = require('../../dtos/groupDtos');
+const { listPaginationDto } = require('../../dtos/paginationDtos');
+const {
+    setPaginationHeaders
+} = require('../../helpers/paginationHeaders');
 
 const createGroupController = ({ groupService }) => {
     const getGroupsForUser = asyncHandler(async (req, res) => {
-        const groups = await groupService.getGroupsForUser(req.user.userId);
-        res.status(200).json(groups);
+        const result = await groupService.getGroupsForUser(
+            req.user.userId,
+            listPaginationDto(req.validated?.query)
+        );
+        setPaginationHeaders(res, result.count, result.pagination);
+        res.status(200).json(result.groups);
     });
 
     const getGroupById = asyncHandler(async (req, res) => {

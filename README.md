@@ -335,10 +335,11 @@ Todas las operaciones aceptan un objeto `options` como último argumento. El
 contexto genérico se entrega como `{ transaction }`; los repositorios lo
 traducen a la sesión que necesita Mongoose. No se usan argumentos posicionales
 distintos entre repositorios. Los filtros forman parte del nombre del método:
-por ejemplo, `findActiveById` y `findActiveByParticipant` hacen explícito si se
-consultan registros activos. El historial recibe un objeto de consulta con
-estado, página y límite; el repositorio aplica filtro, ordenamiento y
-paginación antes de recuperar documentos.
+por ejemplo, `findActiveById`, `findActiveByDebtor` y
+`findActiveByParticipantAndGroup` hacen explícito si se consultan registros
+activos. Los listados reciben objetos de consulta con página y límite; el
+repositorio aplica filtro, ordenamiento y paginación antes de recuperar
+documentos.
 
 ### Administrador de transacciones
 
@@ -485,6 +486,26 @@ objetos nuevos y únicamente conservan los campos declarados para la operación.
 Los términos de búsqueda admiten entre 2 y 50 caracteres y sus símbolos de
 expresión regular se escapan para tratarlos como texto literal.
 
+Política de identidad de usuarios:
+
+- `name` admite entre 2 y 80 caracteres. Se eliminan los espacios exteriores
+  y los espacios internos consecutivos se convierten en uno solo.
+- `nickname` admite entre 1 y 50 caracteres. Solo se eliminan espacios
+  exteriores; no se cambia su estructura ni su capitalización.
+- `email` admite como máximo 254 caracteres. Solo se eliminan espacios
+  exteriores y se conserva su capitalización.
+- Una contraseña nueva debe tener al menos 8 caracteres. No se exigen
+  mayúsculas, números, símbolos ni una longitud máxima, y su contenido no se
+  recorta ni transforma.
+- El login no aplica retroactivamente el mínimo de 8 caracteres, por lo que una
+  cuenta histórica con una contraseña más corta puede seguir autenticándose.
+
+Email y nickname son identidades sensibles a mayúsculas. Por ejemplo,
+`leon` y `LEON` son nicknames diferentes; `lomasFresa@gmail.com` y
+`lomasfresa@gmail.com` también son correos diferentes. El login y las búsquedas
+exactas deben utilizar la misma capitalización con la que se registró la cuenta.
+Los índices únicos de MongoDB conservan esta misma comparación exacta.
+
 Contratos de body:
 
 | Operación | Campos permitidos |
@@ -551,9 +572,9 @@ pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
 | Campo | Descripción |
 |---|---|
 | `name` | Nombre del usuario. |
-| `nickname` | Identificador público único. |
-| `email` | Correo único. |
-| `password` | Contraseña cifrada. |
+| `nickname` | Identificador público único y sensible a mayúsculas. |
+| `email` | Correo único y sensible a mayúsculas. |
+| `password` | Contraseña cifrada; las nuevas requieren mínimo 8 caracteres. |
 | `state` | Estado activo del usuario. |
 
 `owe` y `owes` no se almacenan en `User`. Se agregan a las respuestas de
@@ -602,6 +623,10 @@ El reporte identifica:
 - valores ausentes, no numéricos, iguales a cero o negativos;
 - diferencias entre los antiguos `owe` y `owes` y los saldos derivados;
 - participantes de deudas que no tienen un usuario asociado;
+- nombres, nicknames o correos que incumplen los límites vigentes;
+- nombres con espacios no normalizados y correos o nicknames con espacios
+  exteriores heredados;
+- correos con formato inválido;
 - índices globales únicos heredados sobre `Group.name`.
 
 La auditoría no realiza escrituras. Un índice heredado `name_1` puede seguir
@@ -724,6 +749,19 @@ El historial v2 separa datos y metadatos:
 }
 ```
 
+Los demás listados activos también están paginados:
+
+```http
+GET /api/v2/group?page=1&limit=20
+GET /api/v2/payment?page=1&limit=20
+GET /api/v2/payment/group/ABC123?page=1&limit=20
+GET /api/v2/payment/summary?debtsPage=1&creditsPage=1&limit=20
+```
+
+Los tres primeros utilizan una sola entrada `meta.pagination`. El resumen
+mantiene páginas independientes en `meta.pagination.debts` y
+`meta.pagination.credits`; sus conteos totales están en `meta.count`.
+
 ### Migración desde endpoints sin versión
 
 | Endpoint temporal | Endpoint v2 |
@@ -737,6 +775,11 @@ El historial v2 separa datos y metadatos:
 Al migrar el frontend debe leerse el recurso desde `response.data.data` si la
 librería HTTP conserva la respuesta completa, o desde `body.data` al trabajar
 directamente con `fetch`. Los conteos y la paginación pasan a `body.meta`.
+
+Los listados legacy que históricamente devolvían un arreglo (`/api/group` y
+`/api/payment`) conservan ese body durante la transición, pero ahora entregan
+como máximo una página. Sus metadatos se publican en `X-Total-Count`, `X-Page`,
+`X-Limit` y `X-Total-Pages`; estos encabezados están expuestos mediante CORS.
 
 Los endpoints sin versión están deprecados desde el **13 de agosto de 2026** y
 su `Sunset` está programado para el **1 de febrero de 2027 a las 00:00 UTC**.
@@ -842,8 +885,8 @@ como máximo `50` resultados.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/group` | Lista los grupos del usuario. |
-| `GET` | `/api/group/mygroups` | Alias legacy deprecado; usar `/api/v2/group`. |
+| `GET` | `/api/group` | Lista paginada de grupos del usuario. |
+| `GET` | `/api/group/mygroups` | Alias paginado legacy deprecado; usar `/api/v2/group`. |
 | `GET` | `/api/group/:id` | Consulta un grupo al que pertenece. |
 | `POST` | `/api/group` | Crea un grupo. |
 | `POST` | `/api/group/addMember` | Agrega una persona; puede hacerlo cualquier integrante. |
@@ -859,6 +902,11 @@ Deprecation: @1786579200
 Link: </api/v2/group>; rel="successor-version"
 Sunset: Mon, 01 Feb 2027 00:00:00 GMT
 ```
+
+El listado recibe `page` y `limit`, se ordena por `_id` descendente y devuelve
+20 grupos por defecto, con un máximo de 50. El body legacy continúa siendo un
+arreglo y sus totales están disponibles en los encabezados `X-*` descritos
+anteriormente.
 
 Crear grupo:
 
@@ -884,10 +932,10 @@ documentos de deuda.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/payment` | Lista deudas activas del usuario como deudor. |
-| `GET` | `/api/payment/summary` | Resumen de deudas y créditos activos. |
+| `GET` | `/api/payment` | Lista paginada de deudas activas del usuario como deudor. |
+| `GET` | `/api/payment/summary` | Resumen paginado de deudas y créditos activos. |
 | `GET` | `/api/payment/history` | Historial activo y pagado con páginas independientes. |
-| `GET` | `/api/payment/group/:groupCode` | Deudas activas del usuario en un grupo. |
+| `GET` | `/api/payment/group/:groupCode` | Deudas activas paginadas del usuario en un grupo. |
 | `GET` | `/api/payment/:id` | Consulta una deuda como acreedor o deudor. |
 | `POST` | `/api/payment` | Crea una deuda. |
 | `PUT` | `/api/payment/:id` | Modifica su descripción; solo acreedor. |
@@ -910,6 +958,12 @@ Crear deuda:
 
 El valor se interpreta por persona y se crea un documento independiente para
 cada deudor.
+
+Los listados general y por grupo reciben `page` y `limit`. El resumen utiliza
+`debtsPage`, `creditsPage` y `limit` para navegar sus dos listas sin acoplarlas.
+Todos ordenan por `debtDate` y luego por `_id`, desde la deuda más reciente
+hasta la más antigua. Las páginas empiezan en 1, el límite predeterminado es 20
+y el máximo es 50.
 
 ## Historial de deudas
 
@@ -978,13 +1032,17 @@ todos los documentos encontrados, no solamente los de la página actual.
 
 ## Índices y consultas paginadas
 
-El historial se filtra, ordena y pagina en MongoDB mediante `sort`, `skip` y
-`limit`; el servicio no carga la colección completa ni la ordena en memoria.
+El historial, los listados activos, el resumen, las deudas por grupo y los
+grupos del usuario se filtran, ordenan y paginan en MongoDB mediante `sort`,
+`skip` y `limit`; el servicio no carga la colección completa ni la ordena en
+memoria.
 Los esquemas declaran índices compuestos para:
 
 - acreedor o deudor, estado y fecha de creación;
 - acreedor o deudor, estado y fecha de pago;
 - grupo, estado y cada tipo de participante;
+- grupo, estado, participante, fecha de deuda e `_id` para páginas activas;
+- integrante, estado e `_id` para los grupos del usuario;
 - estado y nickname del usuario.
 
 El orden incluye `_id` como criterio de desempate para que una página sea
@@ -1040,6 +1098,8 @@ Cobertura inicial:
 - Separación y orden del historial.
 - Paginación independiente, conteos totales y ordenamiento en MongoDB.
 - Paginación y orden estable de búsquedas parciales por nickname.
+- Paginación de deudas activas, resumen financiero, deudas por grupo y grupos
+  del usuario, con conteos totales y límites en MongoDB.
 - Definición de índices compuestos para deudas y usuarios.
 - Separación y superficie pública del servicio construido de deudas.
 - Propagación de dependencias desde composition root hasta routers.
@@ -1069,6 +1129,14 @@ Cobertura inicial:
 - Registro estructurado y sin credenciales del consumo de `/api/*`.
 - Desactivación configurable de legacy sin afectar el montaje de v2.
 - Bloqueo transaccional de la desactivación cuando existen deudas activas.
+- Límites compartidos de nombre, nickname y correo en HTTP, servicios y
+  Mongoose.
+- Preservación exacta de mayúsculas en email y nickname, incluidos sus índices
+  únicos y búsquedas exactas.
+- Contraseña nueva con mínimo de 8 caracteres y compatibilidad de login para
+  cuentas históricas.
+- Conflictos específicos de email y nickname durante actualizaciones y
+  colisiones concurrentes.
 - Encabezados de Helmet, CORS local y límite de cuerpos JSON.
 - Rate limiting deshabilitado por defecto y contratos `429` de los tres
   limitadores cuando se activan.

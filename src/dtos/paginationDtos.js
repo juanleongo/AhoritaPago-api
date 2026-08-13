@@ -6,6 +6,17 @@ const historyPaginationDto = (query = {}) => ({
     limit: query.limit ?? PAGINATION.defaultLimit
 });
 
+const listPaginationDto = (query = {}) => ({
+    page: query.page ?? PAGINATION.defaultPage,
+    limit: query.limit ?? PAGINATION.defaultLimit
+});
+
+const summaryPaginationDto = (query = {}) => ({
+    debtsPage: query.debtsPage ?? PAGINATION.defaultPage,
+    creditsPage: query.creditsPage ?? PAGINATION.defaultPage,
+    limit: query.limit ?? PAGINATION.defaultLimit
+});
+
 const searchPaginationDto = (query = {}) => ({
     page: query.page ?? PAGINATION.defaultPage,
     limit: query.limit ?? PAGINATION.defaultLimit
@@ -13,5 +24,7 @@ const searchPaginationDto = (query = {}) => ({
 
 module.exports = {
     historyPaginationDto,
+    listPaginationDto,
+    summaryPaginationDto,
     searchPaginationDto
 };
