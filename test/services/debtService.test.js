@@ -346,36 +346,6 @@ describe('debtService: historial y consistencia financiera', () => {
         assert.equal(createdDebts.length, 1);
     });
 
-    it('elimina una deuda sin modificar documentos de usuario', async () => {
-        const { state, transaction, transactionManager } = (
-            createTestTransactionManager()
-        );
-        const service = createService(transactionManager);
-        await withStubs(
-            debtRepository,
-            {
-                findById: async (id, options) => {
-                    assert.deepEqual(options, { transaction });
-                    return {
-                        creditor: 'creditor',
-                        debtor: ['debtor'],
-                        value: 30,
-                        state: true
-                    };
-                },
-                deleteById: async (id, options) => {
-                    assert.deepEqual(options, { transaction });
-                    return { _id: id };
-                }
-            },
-            async () => {
-                await service.deleteDebt('debt-1', 'creditor');
-            }
-        );
-
-        assert.equal(state.committed, true);
-    });
-
     it('marca una deuda como pagada con el mismo contexto', async () => {
         const { state, transaction, transactionManager } = (
             createTestTransactionManager()

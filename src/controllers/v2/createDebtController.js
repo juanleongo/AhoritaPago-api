@@ -66,18 +66,6 @@ const createDebtControllerV2 = ({ debtService }) => {
         }));
     });
 
-    const deleteDebt = asyncHandler(async (req, res) => {
-        await debtService.deleteDebt(
-            req.validated.params.id,
-            req.user.userId
-        );
-
-        res.status(200).json(createSuccessResponse({
-            data: null,
-            message: 'Deuda eliminada correctamente'
-        }));
-    });
-
     const markAsPay = asyncHandler(async (req, res) => {
         const debt = await debtService.markAsPaid(
             req.validated.params.id,
@@ -141,7 +129,6 @@ const createDebtControllerV2 = ({ debtService }) => {
 
     return {
         createDebt,
-        deleteDebt,
         getAllDebts,
         getDebtById,
         getDebtHistory,

@@ -40,7 +40,6 @@ describe('cobertura de validación en rutas', () => {
             [debtRouter, 'post', '/'],
             [debtRouter, 'put', '/:id'],
             [debtRouter, 'put', '/pay/:id'],
-            [debtRouter, 'delete', '/:id'],
             [debtRouter, 'get', '/history'],
             [debtRouter, 'get', '/summary'],
             [debtRouter, 'get', '/group/:groupCode'],
@@ -67,8 +66,7 @@ describe('cobertura de validación en rutas', () => {
             [debtRouter, 'get', '/group/:groupCode'],
             [debtRouter, 'get', '/:id'],
             [debtRouter, 'put', '/:id'],
-            [debtRouter, 'put', '/pay/:id'],
-            [debtRouter, 'delete', '/:id']
+            [debtRouter, 'put', '/pay/:id']
         ];
 
         routes.forEach(([router, method, path]) => {

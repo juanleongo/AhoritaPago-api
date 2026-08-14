@@ -64,11 +64,6 @@ const createDebtRouter = ({ authVerify, debtController }) => {
         ...debtIdValidators,
         validateForms
     ], debtController.markAsPay);
-    router.delete('/:id', [
-        allowOnlyFields([]),
-        ...debtIdValidators,
-        validateForms
-    ], debtController.deleteDebt);
 
     return router;
 };

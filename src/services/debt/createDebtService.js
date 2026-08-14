@@ -1,6 +1,5 @@
 const { createDebtAccess } = require('./debtAccess');
 const { createCreateDebt } = require('./createDebt');
-const { createDeleteDebt } = require('./deleteDebt');
 const { createGetAllDebts } = require('./getAllDebts');
 const { createGetDebtById } = require('./getDebtById');
 const {
@@ -27,11 +26,6 @@ const createDebtService = ({
             debtAccess,
             debtRepository,
             groupRepository,
-            transactionManager
-        }),
-        deleteDebt: createDeleteDebt({
-            debtAccess,
-            debtRepository,
             transactionManager
         }),
         getAllDebts: createGetAllDebts({ debtRepository }),

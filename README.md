@@ -8,7 +8,7 @@ HTTP soportada se publica exclusivamente bajo `/api/v2` y responde en JSON.
 - Registro e inicio de sesión con JWT.
 - Creación y administración de grupos.
 - Incorporación de integrantes por cualquier miembro del grupo.
-- Creación, consulta, actualización, pago y eliminación de deudas.
+- Creación, consulta, actualización y pago de deudas con historial permanente.
 - Historial separado entre deudas activas y pagadas.
 - Resumen financiero y saldos calculados desde las deudas activas.
 - Paginación y ordenamiento de listados desde MongoDB.
@@ -280,7 +280,6 @@ Un grupo con deudas activas no puede desactivarse; la API responde
 | `POST` | `/api/v2/payment` | Crea una o varias deudas. |
 | `PUT` | `/api/v2/payment/:id` | Actualiza la descripción. |
 | `PUT` | `/api/v2/payment/pay/:id` | Marca una deuda como pagada. |
-| `DELETE` | `/api/v2/payment/:id` | Elimina una deuda. |
 
 Body de creación:
 
@@ -301,9 +300,12 @@ grupo, el valor debe ser finito y mayor que cero, no se permiten deudores
 repetidos y el acreedor no puede incluirse como deudor. Se persiste una deuda
 independiente por cada deudor.
 
-Solo el acreedor puede modificar o eliminar la deuda. Acreedor y deudor pueden
-marcarla como pagada. Una deuda pagada no puede procesarse otra vez ni modificar
-su descripción.
+Solo el acreedor puede modificar la deuda. Acreedor y deudor pueden marcarla
+como pagada. Una deuda pagada conserva su documento con `state: false` y
+`paymentDate`, deja de afectar los saldos activos y aparece en `history.paid`.
+No existe una operación HTTP ni un método de repositorio para eliminar deudas
+físicamente. Una deuda pagada no puede procesarse otra vez ni modificar su
+descripción.
 
 ## Paginación y ordenamiento
 
@@ -356,7 +358,7 @@ metadatos dentro de `meta`.
 saldos los calcula desde las deudas activas, evitando mantener dos fuentes de
 verdad.
 
-Crear, pagar y eliminar deudas utiliza el administrador de transacciones. Si
+Crear y pagar deudas utiliza el administrador de transacciones. Si
 falla una operación dentro del caso de uso, MongoDB aborta la transacción.
 
 Crear una deuda y desactivar su grupo realizan primero una escritura
@@ -399,6 +401,7 @@ La cobertura incluye:
 - controladores v2 y contratos JSON;
 - servicios y reglas de negocio;
 - repositorios, índices y transacciones;
+- permanencia de las deudas pagadas y clasificación en `history.paid`;
 - concurrencia real entre creación de deuda y desactivación de grupo sobre un
   replica set efímero;
 - esquemas Mongoose e integridad de datos;

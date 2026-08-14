@@ -64,6 +64,14 @@ describe('protección de rutas', () => {
         assert.ok(historyIndex < dynamicIdIndex);
     });
 
+    it('no expone eliminación física de deudas', () => {
+        const deleteRoutes = debtRouter.stack.filter(layer => (
+            layer.route?.methods.delete
+        ));
+
+        assert.deepEqual(deleteRoutes, []);
+    });
+
     it('no incluye /mygroups en el router de grupos', () => {
         const paths = groupRouter.stack
             .filter(layer => layer.route)

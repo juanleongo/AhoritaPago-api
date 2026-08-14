@@ -4,7 +4,6 @@ const { createDebtService } = require(
     '../../src/services/debt/createDebtService'
 );
 const { createCreateDebt } = require('../../src/services/debt/createDebt');
-const { createDeleteDebt } = require('../../src/services/debt/deleteDebt');
 const { createGetAllDebts } = require('../../src/services/debt/getAllDebts');
 const { createGetDebtById } = require('../../src/services/debt/getDebtById');
 const {
@@ -29,7 +28,6 @@ describe('estructura modular del servicio de deudas', () => {
 
         assert.deepEqual(Object.keys(debtService).sort(), [
             'createDebt',
-            'deleteDebt',
             'getAllDebts',
             'getDebtById',
             'getDebtHistoryForUser',
@@ -44,7 +42,6 @@ describe('estructura modular del servicio de deudas', () => {
         [
             createDebtService,
             createCreateDebt,
-            createDeleteDebt,
             createGetAllDebts,
             createGetDebtById,
             createGetDebtHistoryForUser,

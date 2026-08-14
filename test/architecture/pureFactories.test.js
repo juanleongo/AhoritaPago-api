@@ -31,6 +31,7 @@ const removedFacades = [
     'src/services/debtservice.js',
     'src/services/groupService.js',
     'src/services/userService.js',
+    'src/services/debt/deleteDebt.js',
     'src/config/apiLifecycle.js',
     'src/controllers/factories/createAuthController.js',
     'src/controllers/factories/createDebtController.js',

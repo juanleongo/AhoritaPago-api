@@ -52,10 +52,6 @@ const create = async (debtData, options = {}) => {
     return debt.save(buildWriteOptions(options));
 };
 
-const deleteById = async (id, options = {}) => (
-    Debt.findByIdAndDelete(id, buildWriteOptions(options))
-);
-
 const updateById = async (id, debtData, options = {}) => (
     Debt.findByIdAndUpdate(
         id,
@@ -266,7 +262,6 @@ module.exports = {
     countActiveByParticipantAndGroup,
     countHistoryByParticipant,
     create,
-    deleteById,
     existsActiveByGroup,
     existsActiveByParticipant,
     findActiveByCreditor,

@@ -58,7 +58,6 @@ describe('contratos de repositorios', () => {
             'countActiveByParticipantAndGroup',
             'countHistoryByParticipant',
             'create',
-            'deleteById',
             'existsActiveByGroup',
             'existsActiveByParticipant',
             'findActiveByCreditor',

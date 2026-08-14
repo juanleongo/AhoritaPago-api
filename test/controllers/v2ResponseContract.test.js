@@ -221,7 +221,6 @@ describe('contrato uniforme de controladores v2', () => {
         const controller = createDebtControllerV2({
             debtService: {
                 async createDebt() { return [debt]; },
-                async deleteDebt() {},
                 async getAllDebts() {
                     return {
                         count: 1,
@@ -270,7 +269,6 @@ describe('contrato uniforme de controladores v2', () => {
                     query: {}
                 }
             }),
-            deleteDebt: baseRequest(),
             getAllDebts: baseRequest(),
             getDebtById: baseRequest(),
             getDebtHistory: baseRequest(),
@@ -312,7 +310,5 @@ describe('contrato uniforme de controladores v2', () => {
             requests.getDebtsInGroup
         );
         assert.equal(groupDebts.body.meta.pagination.limit, 20);
-        const deleted = await invoke(controller.deleteDebt, requests.deleteDebt);
-        assert.equal(deleted.body.data, null);
     });
 });
