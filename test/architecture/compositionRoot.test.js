@@ -172,6 +172,54 @@ describe('composition root e inyección de dependencias', () => {
         assert.deepEqual(calls, ['runInTransaction']);
     });
 
+    it('inyecta deudas y transacciones en la desactivación de grupos', async () => {
+        const transaction = { id: 'group-transaction' };
+        const calls = [];
+        const root = createCompositionRoot({
+            infrastructure: {
+                config: createTestAppConfig(),
+                transactionManager: {
+                    async runInTransaction(work) {
+                        calls.push(['runInTransaction']);
+                        return work(transaction);
+                    }
+                }
+            },
+            repositories: {
+                debt: {
+                    async existsActiveByGroup(id, options) {
+                        calls.push(['existsActiveByGroup', id, options]);
+                        return false;
+                    }
+                },
+                group: {
+                    async deactivateById(id, options) {
+                        calls.push(['deactivateById', id, options]);
+                        return { _id: id, state: false };
+                    },
+                    async findActiveById(id, options) {
+                        calls.push(['findActiveById', id, options]);
+                        return { _id: id, admin: 'admin-1' };
+                    }
+                },
+                user: {}
+            }
+        });
+
+        const result = await root.services.group.deleteGroup(
+            'group-1',
+            'admin-1'
+        );
+
+        assert.deepEqual(result, { _id: 'group-1', state: false });
+        assert.deepEqual(calls, [
+            ['runInTransaction'],
+            ['findActiveById', 'group-1', { transaction }],
+            ['existsActiveByGroup', 'group-1', { transaction }],
+            ['deactivateById', 'group-1', { transaction }]
+        ]);
+    });
+
     it('inyecta JWT y repositorio en el middleware de autenticación', async () => {
         const { calls, root } = createInjectedDependencies();
         const req = {

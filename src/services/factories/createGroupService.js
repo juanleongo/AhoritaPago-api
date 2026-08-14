@@ -25,9 +25,11 @@ const isGroupMember = (group, userId) => (
 );
 
 const createGroupService = ({
+    debtRepository,
     groupRepository,
-    userRepository,
-    generateRandomCode
+    generateRandomCode,
+    transactionManager,
+    userRepository
 }) => {
     const getGroupsForUser = async (userId, pagination = {}) => {
         const page = pagination.page ?? PAGINATION.defaultPage;
@@ -137,24 +139,41 @@ const createGroupService = ({
     };
 
     const deleteGroup = async (id, authenticatedUserId) => {
-        const existingGroup = await groupRepository.findActiveById(id);
-        if (!existingGroup) {
-            throw createHttpError(
-                404,
-                'Grupo no encontrado',
-                'GROUP_NOT_FOUND'
+        return transactionManager.runInTransaction(async transaction => {
+            const existingGroup = await groupRepository.findActiveById(
+                id,
+                { transaction }
             );
-        }
+            if (!existingGroup) {
+                throw createHttpError(
+                    404,
+                    'Grupo no encontrado',
+                    'GROUP_NOT_FOUND'
+                );
+            }
 
-        if (!isSameId(existingGroup.admin, authenticatedUserId)) {
-            throw createHttpError(
-                403,
-                'Solo el administrador puede eliminar el grupo',
-                'GROUP_DELETE_FORBIDDEN'
+            if (!isSameId(existingGroup.admin, authenticatedUserId)) {
+                throw createHttpError(
+                    403,
+                    'Solo el administrador puede eliminar el grupo',
+                    'GROUP_DELETE_FORBIDDEN'
+                );
+            }
+
+            const hasActiveDebts = await debtRepository.existsActiveByGroup(
+                id,
+                { transaction }
             );
-        }
+            if (hasActiveDebts) {
+                throw createHttpError(
+                    409,
+                    'No puedes desactivar el grupo mientras tenga deudas activas.',
+                    'GROUP_HAS_ACTIVE_DEBTS'
+                );
+            }
 
-        return groupRepository.deactivateById(id);
+            return groupRepository.deactivateById(id, { transaction });
+        });
     };
 
     const addMemberToGroup = async (groupCode, userNick, requesterId) => {

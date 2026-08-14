@@ -58,6 +58,7 @@ describe('contratos de repositorios', () => {
             'countHistoryByParticipant',
             'create',
             'deleteById',
+            'existsActiveByGroup',
             'existsActiveByParticipant',
             'findActiveByCreditor',
             'findActiveByDebtor',
@@ -507,7 +508,42 @@ describe('contratos de repositorios', () => {
         }
     });
 
-    it('consulta deudas activas dentro de la transacción', async () => {
+    it('consulta deudas activas del grupo dentro de la transacción', async () => {
+        const originalExists = Debt.exists;
+        const transaction = { id: 'transaction-1' };
+        let receivedFilter;
+        let receivedSession;
+
+        Debt.exists = filter => {
+            receivedFilter = filter;
+            return {
+                session(value) {
+                    receivedSession = value;
+                    return this;
+                }
+            };
+        };
+
+        try {
+            assert.equal(
+                await debtRepository.existsActiveByGroup(
+                    'group-1',
+                    { transaction }
+                ),
+                true
+            );
+        } finally {
+            Debt.exists = originalExists;
+        }
+
+        assert.deepEqual(receivedFilter, {
+            group: 'group-1',
+            state: true
+        });
+        assert.equal(receivedSession, transaction);
+    });
+
+    it('consulta deudas activas del participante en la transacción', async () => {
         const originalExists = Debt.exists;
         const transaction = { id: 'transaction-1' };
         let receivedFilter;

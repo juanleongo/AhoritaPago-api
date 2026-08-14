@@ -264,6 +264,8 @@ Body para agregar un integrante:
 Cualquier integrante puede agregar personas. Solo el administrador puede
 actualizar o desactivar el grupo. Los códigos se generan con reintentos
 limitados y un índice único de MongoDB protege frente a colisiones concurrentes.
+Un grupo con deudas activas no puede desactivarse; la API responde
+`409 GROUP_HAS_ACTIVE_DEBTS` y conserva el grupo activo.
 
 ## Deudas y pagos
 
@@ -401,6 +403,7 @@ La cobertura incluye:
 | `401` | `TOKEN_INVALID_OR_EXPIRED` | JWT inválido o expirado. |
 | `403` | `FORBIDDEN` | El usuario no tiene permiso. |
 | `404` | `ROUTE_NOT_FOUND` | La ruta no existe. |
+| `409` | `GROUP_HAS_ACTIVE_DEBTS` | El grupo conserva deudas activas. |
 | `409` | `USER_HAS_ACTIVE_DEBTS` | La cuenta participa en deudas activas. |
 | `409` | `DEBT_ALREADY_PAID` | La deuda ya fue pagada. |
 | `413` | `PAYLOAD_TOO_LARGE` | El body supera el límite configurado. |

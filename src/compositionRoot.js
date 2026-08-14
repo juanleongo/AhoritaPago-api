@@ -94,8 +94,10 @@ const createCompositionRoot = (overrides = {}) => {
         userRepository: repositories.user
     });
     services.group = overrides.services?.group || createGroupService({
+        debtRepository: repositories.debt,
         generateRandomCode: infrastructure.generateRandomCode,
         groupRepository: repositories.group,
+        transactionManager: infrastructure.transactionManager,
         userRepository: repositories.user
     });
     services.auth = overrides.services?.auth || createAuthService({

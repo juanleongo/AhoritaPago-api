@@ -68,6 +68,18 @@ const findById = async (id, options = {}) => (
     applyTransaction(Debt.findById(id), options)
 );
 
+const existsActiveByGroup = async (groupId, options = {}) => {
+    const existingDebt = await applyTransaction(
+        Debt.exists({
+            group: groupId,
+            state: true
+        }),
+        options
+    );
+
+    return Boolean(existingDebt);
+};
+
 const existsActiveByParticipant = async (userId, options = {}) => {
     const existingDebt = await applyTransaction(
         Debt.exists({
@@ -255,6 +267,7 @@ module.exports = {
     countHistoryByParticipant,
     create,
     deleteById,
+    existsActiveByGroup,
     existsActiveByParticipant,
     findActiveByCreditor,
     findActiveByDebtor,
