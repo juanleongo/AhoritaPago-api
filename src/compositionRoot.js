@@ -18,22 +18,6 @@ const {
     createHttpSecurity
 } = require('./middlewares/factories/createHttpSecurity');
 const {
-    createDeprecateEndpoint,
-    createLegacySuccessorResolver
-} = require('./middlewares/deprecateEndpoint');
-const {
-    createUserController
-} = require('./controllers/factories/createUserController');
-const {
-    createGroupController
-} = require('./controllers/factories/createGroupController');
-const {
-    createAuthController
-} = require('./controllers/factories/createAuthController');
-const {
-    createDebtController
-} = require('./controllers/factories/createDebtController');
-const {
     createAuthControllerV2
 } = require('./controllers/v2/createAuthController');
 const {
@@ -45,9 +29,6 @@ const {
 const {
     createUserControllerV2
 } = require('./controllers/v2/createUserController');
-const {
-    createUserRouter
-} = require('./routes/factories/createUserRouter');
 const {
     createGroupRouter
 } = require('./routes/factories/createGroupRouter');
@@ -82,10 +63,6 @@ const createCompositionRoot = (overrides = {}) => {
 
     const infrastructure = {
         config,
-        apiLifecycleConfig: (
-            overrides.infrastructure?.apiLifecycleConfig
-            || config.apiLifecycle
-        ),
         passwordHasher: (
             overrides.infrastructure?.passwordHasher || bcrypt
         ),
@@ -102,8 +79,7 @@ const createCompositionRoot = (overrides = {}) => {
         httpSecurityConfig: (
             overrides.infrastructure?.httpSecurityConfig
             || config.httpSecurity
-        ),
-        logger: overrides.infrastructure?.logger || console
+        )
     };
 
     const services = {};
@@ -137,42 +113,6 @@ const createCompositionRoot = (overrides = {}) => {
     const httpSecurity = createHttpSecurity(
         infrastructure.httpSecurityConfig
     );
-    const legacyApiEnabled = (
-        infrastructure.apiLifecycleConfig.legacyApiEnabled
-    );
-    const createLegacyMiddleware = (
-        successorBasePath,
-        pathRewrites = {}
-    ) => createDeprecateEndpoint({
-        deprecationDate: (
-            infrastructure.apiLifecycleConfig.legacyApiDeprecationDate
-        ),
-        logger: infrastructure.logger,
-        logUsage: infrastructure.apiLifecycleConfig.legacyApiLogUsage,
-        resolveSuccessorPath: createLegacySuccessorResolver({
-            pathRewrites,
-            successorBasePath
-        }),
-        sunsetDate: infrastructure.apiLifecycleConfig.legacyApiSunsetDate
-    });
-    const legacyApi = legacyApiEnabled ? (overrides.middleware?.legacyApi || {
-        auth: createLegacyMiddleware('/api/v2/auth'),
-        debt: createLegacyMiddleware('/api/v2/payment'),
-        group: createLegacyMiddleware('/api/v2/group', {
-            '/mygroups': ''
-        }),
-        user: createLegacyMiddleware('/api/v2/user', {
-            '/nick': req => {
-                const nickname = typeof req.body?.nick === 'string'
-                    ? req.body.nick.trim()
-                    : '';
-
-                return nickname
-                    ? `/by-nickname/${encodeURIComponent(nickname)}`
-                    : '/by-nickname';
-            }
-        })
-    }) : null;
     const middleware = {
         authVerify: (
             overrides.middleware?.authVerify
@@ -195,83 +135,50 @@ const createCompositionRoot = (overrides = {}) => {
         registrationRateLimiter: (
             overrides.middleware?.registrationRateLimiter
             ?? httpSecurity.registrationRateLimiter
-        ),
-        legacyApi
-    };
-
-    const controllers = {};
-    if (legacyApiEnabled) {
-        controllers.user = overrides.controllers?.user || createUserController({
-            userService: services.user
-        });
-        controllers.group = overrides.controllers?.group || createGroupController({
-            groupService: services.group
-        });
-        controllers.auth = overrides.controllers?.auth || createAuthController({
-            authService: services.auth
-        });
-        controllers.debt = overrides.controllers?.debt || createDebtController({
-            debtService: services.debt
-        });
-    }
-    controllers.v2 = {
-        user: (
-            overrides.controllers?.v2?.user
-            || createUserControllerV2({ userService: services.user })
-        ),
-        group: (
-            overrides.controllers?.v2?.group
-            || createGroupControllerV2({ groupService: services.group })
-        ),
-        auth: (
-            overrides.controllers?.v2?.auth
-            || createAuthControllerV2({ authService: services.auth })
-        ),
-        debt: (
-            overrides.controllers?.v2?.debt
-            || createDebtControllerV2({ debtService: services.debt })
         )
     };
 
-    const routers = {};
-    if (legacyApiEnabled) {
-        routers.user = overrides.routers?.user || createUserRouter({
-            authVerify: middleware.authVerify,
-            registrationRateLimiter: middleware.registrationRateLimiter,
-            userController: controllers.user
-        });
-        routers.group = overrides.routers?.group || createGroupRouter({
-            authVerify: middleware.authVerify,
-            groupController: controllers.group
-        });
-        routers.auth = overrides.routers?.auth || createAuthRouter({
-            authController: controllers.auth,
-            loginRateLimiter: middleware.loginRateLimiter
-        });
-        routers.debt = overrides.routers?.debt || createDebtRouter({
-            authVerify: middleware.authVerify,
-            debtController: controllers.debt
-        });
-    }
-    routers.v2 = {
-        user: overrides.routers?.v2?.user || createUserRouterV2({
-            authVerify: middleware.authVerify,
-            registrationRateLimiter: middleware.registrationRateLimiter,
-            userController: controllers.v2.user
-        }),
-        group: overrides.routers?.v2?.group || createGroupRouter({
-            authVerify: middleware.authVerify,
-            groupController: controllers.v2.group,
-            includeDeprecatedAliases: false
-        }),
-        auth: overrides.routers?.v2?.auth || createAuthRouter({
-            authController: controllers.v2.auth,
-            loginRateLimiter: middleware.loginRateLimiter
-        }),
-        debt: overrides.routers?.v2?.debt || createDebtRouter({
-            authVerify: middleware.authVerify,
-            debtController: controllers.v2.debt
-        })
+    const controllers = {
+        v2: {
+            auth: (
+                overrides.controllers?.v2?.auth
+                || createAuthControllerV2({ authService: services.auth })
+            ),
+            debt: (
+                overrides.controllers?.v2?.debt
+                || createDebtControllerV2({ debtService: services.debt })
+            ),
+            group: (
+                overrides.controllers?.v2?.group
+                || createGroupControllerV2({ groupService: services.group })
+            ),
+            user: (
+                overrides.controllers?.v2?.user
+                || createUserControllerV2({ userService: services.user })
+            )
+        }
+    };
+
+    const routers = {
+        v2: {
+            auth: overrides.routers?.v2?.auth || createAuthRouter({
+                authController: controllers.v2.auth,
+                loginRateLimiter: middleware.loginRateLimiter
+            }),
+            debt: overrides.routers?.v2?.debt || createDebtRouter({
+                authVerify: middleware.authVerify,
+                debtController: controllers.v2.debt
+            }),
+            group: overrides.routers?.v2?.group || createGroupRouter({
+                authVerify: middleware.authVerify,
+                groupController: controllers.v2.group
+            }),
+            user: overrides.routers?.v2?.user || createUserRouterV2({
+                authVerify: middleware.authVerify,
+                registrationRateLimiter: middleware.registrationRateLimiter,
+                userController: controllers.v2.user
+            })
+        }
     };
 
     return {

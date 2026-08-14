@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
 const {
-    createUserController
-} = require('../../src/controllers/factories/createUserController');
+    createUserControllerV2
+} = require('../../src/controllers/v2/createUserController');
 const {
     createGroupService
 } = require('../../src/services/factories/createGroupService');
@@ -40,7 +40,7 @@ describe('retiro de código muerto', () => {
             transactionManager: {},
             userRepository: {}
         });
-        const controller = createUserController({ userService: service });
+        const controller = createUserControllerV2({ userService: service });
 
         assert.equal('getAllUsers' in service, false);
         assert.equal('getAllUsers' in controller, false);

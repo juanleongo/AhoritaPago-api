@@ -126,7 +126,7 @@ test('activa encabezados defensivos y CORS para el frontend local', async () => 
         );
         assert.equal(
             response.headers.get('access-control-expose-headers'),
-            'Deprecation,Link,Sunset,X-Limit,X-Page,X-Total-Count,X-Total-Pages'
+            null
         );
     });
 });
@@ -166,7 +166,7 @@ test('rechaza cuerpos JSON que superan el límite configurado', async () => {
     const server = new Server({ compositionRoot });
 
     await withHttpServer(server, async baseUrl => {
-        const response = await fetch(`${baseUrl}/api/user`, {
+        const response = await fetch(`${baseUrl}/api/v2/user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: 'x'.repeat(2048) })
@@ -192,7 +192,7 @@ test('rechaza la configuración inválida antes de construir Express', () => {
     );
 });
 
-test('expone autenticación v2 sin retirar la ruta legacy', async () => {
+test('monta exclusivamente la API v2 y conserva su contrato', async () => {
     const compositionRoot = createCompositionRoot({
         infrastructure: { config: createTestAppConfig() },
         services: {
@@ -200,6 +200,49 @@ test('expone autenticación v2 sin retirar la ruta legacy', async () => {
                 async login() {
                     return 'token-v2';
                 }
+            },
+            debt: {
+                async getAllDebts() {
+                    return {
+                        count: 0,
+                        debts: [],
+                        pagination: {
+                            page: 1,
+                            limit: 20,
+                            totalPages: 0
+                        }
+                    };
+                }
+            },
+            group: {
+                async getGroupsForUser() {
+                    return {
+                        count: 0,
+                        groups: [],
+                        pagination: {
+                            page: 1,
+                            limit: 20,
+                            totalPages: 0
+                        }
+                    };
+                }
+            },
+            user: {
+                async createUser(data) {
+                    return {
+                        uid: 'user-v2',
+                        ...data,
+                        state: true,
+                        owe: 0,
+                        owes: 0
+                    };
+                }
+            }
+        },
+        middleware: {
+            authVerify(req, res, next) {
+                req.user = { userId: 'user-v2' };
+                next();
             }
         }
     });
@@ -214,67 +257,64 @@ test('expone autenticación v2 sin retirar la ruta legacy', async () => {
                 password: 'password'
             })
         });
-        const [legacyResponse, v2Response] = await Promise.all([
-            request('/api/auth/login'),
-            request('/api/v2/auth/login')
-        ]);
-
-        assert.deepEqual(await legacyResponse.json(), {
-            token: 'token-v2'
+        const v2Response = await request('/api/v2/auth/login');
+        const userResponse = await fetch(`${baseUrl}/api/v2/user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: 'Usuario V2',
+                nickname: 'UsuarioV2',
+                email: 'UsuarioV2@example.com',
+                password: '12345678'
+            })
         });
+        const groupResponse = await fetch(`${baseUrl}/api/v2/group`);
+        const debtResponse = await fetch(`${baseUrl}/api/v2/payment`);
+
         assert.deepEqual(await v2Response.json(), {
             success: true,
             data: { token: 'token-v2' }
         });
-        assert.equal(
-            legacyResponse.headers.get('link'),
-            '</api/v2/auth/login>; rel="successor-version"'
-        );
-        assert.equal(
-            legacyResponse.headers.get('sunset'),
-            'Mon, 01 Feb 2027 00:00:00 GMT'
-        );
+        assert.equal(userResponse.status, 201);
+        assert.equal((await userResponse.json()).data.id, 'user-v2');
+        assert.equal(groupResponse.status, 200);
+        assert.deepEqual((await groupResponse.json()).data, []);
+        assert.equal(debtResponse.status, 200);
+        assert.deepEqual((await debtResponse.json()).data, []);
         assert.equal(v2Response.headers.get('deprecation'), null);
         assert.equal(v2Response.headers.get('link'), null);
         assert.equal(v2Response.headers.get('sunset'), null);
     });
 });
 
-test('puede dejar de montar legacy sin afectar v2', async () => {
-    const config = createTestAppConfig({
-        LEGACY_API_ENABLED: 'false'
-    });
+test('las rutas retiradas responden 404 ROUTE_NOT_FOUND', async () => {
     const compositionRoot = createCompositionRoot({
-        infrastructure: { config },
-        services: {
-            auth: {
-                async login() {
-                    return 'token-v2';
-                }
-            }
-        }
+        infrastructure: { config: createTestAppConfig() }
     });
     const server = new Server({ compositionRoot });
 
-    assert.equal(compositionRoot.controllers.user, undefined);
-    assert.equal(compositionRoot.routers.user, undefined);
-    assert.equal(compositionRoot.middleware.legacyApi, null);
+    assert.deepEqual(Object.keys(compositionRoot.controllers), ['v2']);
+    assert.deepEqual(Object.keys(compositionRoot.routers), ['v2']);
+    assert.equal('legacyApi' in compositionRoot.middleware, false);
 
     await withHttpServer(server, async baseUrl => {
-        const request = path => fetch(`${baseUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: 'user@example.com',
-                password: 'password'
-            })
-        });
-        const legacyResponse = await request('/api/auth/login');
-        const v2Response = await request('/api/v2/auth/login');
+        const paths = [
+            '/api/auth',
+            '/api/user',
+            '/api/group',
+            '/api/payment',
+            '/api/group/mygroups'
+        ];
 
-        assert.equal(legacyResponse.status, 404);
-        assert.equal((await legacyResponse.json()).error.code, 'ROUTE_NOT_FOUND');
-        assert.equal(v2Response.status, 200);
-        assert.equal((await v2Response.json()).data.token, 'token-v2');
+        for (const path of paths) {
+            const response = await fetch(`${baseUrl}${path}`);
+            const body = await response.json();
+
+            assert.equal(response.status, 404, path);
+            assert.equal(body.error.code, 'ROUTE_NOT_FOUND', path);
+            assert.equal(response.headers.get('deprecation'), null, path);
+            assert.equal(response.headers.get('link'), null, path);
+            assert.equal(response.headers.get('sunset'), null, path);
+        }
     });
 });

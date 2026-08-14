@@ -15,8 +15,7 @@ const {
 
 const createGroupRouter = ({
     authVerify,
-    groupController,
-    includeDeprecatedAliases = true
+    groupController
 }) => {
     const router = Router();
 
@@ -28,13 +27,6 @@ const createGroupRouter = ({
         validateForms
     ];
 
-    if (includeDeprecatedAliases) {
-        router.get(
-            '/mygroups',
-            listGroupsMiddleware,
-            groupController.getGroupsForUser
-        );
-    }
     router.get('/', listGroupsMiddleware, groupController.getGroupsForUser);
     router.get('/:id', [
         ...groupIdValidators,

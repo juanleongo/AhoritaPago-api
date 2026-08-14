@@ -1,6 +1,5 @@
 const { ConfigurationError } = require('./configurationError');
 const { createHttpSecurityConfig } = require('./httpSecurity');
-const { createApiLifecycleConfig } = require('./apiLifecycle');
 
 const JWT_SECRET_PLACEHOLDER = (
     'reemplazar-con-un-secreto-largo-y-aleatorio'
@@ -95,18 +94,6 @@ const createAppConfig = (env = process.env) => {
     const databaseUrl = parseDatabaseUrl(env.DATABASE_URL, errors);
     const jwtSecret = parseJwtSecret(env.JWT_SECRET, errors);
     let httpSecurity;
-    let apiLifecycle;
-
-    try {
-        apiLifecycle = createApiLifecycleConfig(env);
-    } catch (error) {
-        if (error instanceof ConfigurationError) {
-            errors.push(...error.details);
-        } else {
-            throw error;
-        }
-    }
-
     try {
         httpSecurity = createHttpSecurityConfig(env);
     } catch (error) {
@@ -122,7 +109,6 @@ const createAppConfig = (env = process.env) => {
     }
 
     return deepFreeze({
-        apiLifecycle,
         auth: { jwtSecret },
         database: { url: databaseUrl },
         httpSecurity,

@@ -30,7 +30,15 @@ const removedFacades = [
     'src/services/authService.js',
     'src/services/debtservice.js',
     'src/services/groupService.js',
-    'src/services/userService.js'
+    'src/services/userService.js',
+    'src/config/apiLifecycle.js',
+    'src/controllers/factories/createAuthController.js',
+    'src/controllers/factories/createDebtController.js',
+    'src/controllers/factories/createGroupController.js',
+    'src/controllers/factories/createUserController.js',
+    'src/helpers/paginationHeaders.js',
+    'src/middlewares/deprecateEndpoint.js',
+    'src/routes/factories/createUserRouter.js'
 ];
 
 describe('fábricas puras y carga de módulos', () => {
@@ -47,7 +55,6 @@ describe('fábricas puras y carga de módulos', () => {
             './src/routes/factories/createAuthRouter',
             './src/routes/factories/createDebtRouter',
             './src/routes/factories/createGroupRouter',
-            './src/routes/factories/createUserRouter',
             './src/routes/v2/createUserRouter'
         ];
         const source = `

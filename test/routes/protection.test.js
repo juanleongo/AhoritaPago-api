@@ -6,12 +6,12 @@ const { createTestAppConfig } = require('../fixtures/appConfig');
 const { routers } = createCompositionRoot({
     infrastructure: { config: createTestAppConfig() }
 });
+const { v2 } = routers;
 const {
     debt: debtRouter,
     group: groupRouter,
-    user: userRouter,
-    v2: v2Routers
-} = routers;
+    user: userRouter
+} = v2;
 
 const findMiddlewareIndex = (router, middlewareName) => (
     router.stack.findIndex(layer => layer.name === middlewareName)
@@ -64,29 +64,8 @@ describe('protección de rutas', () => {
         assert.ok(historyIndex < dynamicIdIndex);
     });
 
-    it('protege v2 y publica únicamente su registro de usuarios', () => {
-        const userAuthIndex = findMiddlewareIndex(
-            v2Routers.user,
-            'authVerify'
-        );
-        const groupAuthIndex = findMiddlewareIndex(
-            v2Routers.group,
-            'authVerify'
-        );
-        const debtAuthIndex = findMiddlewareIndex(
-            v2Routers.debt,
-            'authVerify'
-        );
-
-        assert.deepEqual(routesBefore(v2Routers.user, userAuthIndex), [
-            { path: '/', methods: ['post'] }
-        ]);
-        assert.deepEqual(routesBefore(v2Routers.group, groupAuthIndex), []);
-        assert.deepEqual(routesBefore(v2Routers.debt, debtAuthIndex), []);
-    });
-
-    it('no incluye el alias de grupos deprecado dentro de v2', () => {
-        const paths = v2Routers.group.stack
+    it('no incluye /mygroups en el router de grupos', () => {
+        const paths = groupRouter.stack
             .filter(layer => layer.route)
             .map(layer => layer.route.path);
 

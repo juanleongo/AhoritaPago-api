@@ -25,16 +25,6 @@ describe('configuración central de la aplicación', () => {
         assert.equal(config.server.port, 3001);
         assert.equal(config.database.url, VALID_ENV.DATABASE_URL);
         assert.equal(config.auth.jwtSecret, VALID_ENV.JWT_SECRET);
-        assert.equal(config.apiLifecycle.legacyApiEnabled, true);
-        assert.equal(config.apiLifecycle.legacyApiLogUsage, false);
-        assert.equal(
-            config.apiLifecycle.legacyApiDeprecationDate,
-            '2026-08-13T00:00:00.000Z'
-        );
-        assert.equal(
-            config.apiLifecycle.legacyApiSunsetDate,
-            '2027-02-01T00:00:00.000Z'
-        );
         assert.equal(config.httpSecurity.corsAllowLocalhost, false);
         assert.deepEqual(config.httpSecurity.corsAllowedOrigins, [
             'https://app.example.com',
@@ -45,7 +35,6 @@ describe('configuración central de la aplicación', () => {
         assert.equal(config.httpSecurity.trustProxyHops, 2);
         assert.equal(Object.isFrozen(config), true);
         assert.equal(Object.isFrozen(config.auth), true);
-        assert.equal(Object.isFrozen(config.apiLifecycle), true);
         assert.equal(Object.isFrozen(config.httpSecurity), true);
         assert.equal(
             Object.isFrozen(config.httpSecurity.corsAllowedOrigins),

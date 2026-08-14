@@ -6,12 +6,13 @@ const { createTestAppConfig } = require('../fixtures/appConfig');
 const { routers } = createCompositionRoot({
     infrastructure: { config: createTestAppConfig() }
 });
+const { v2 } = routers;
 const {
     auth: authRouter,
     debt: debtRouter,
     group: groupRouter,
     user: userRouter
-} = routers;
+} = v2;
 
 const middlewareNamesFor = (router, method, path) => {
     const layer = router.stack.find(item => (
@@ -28,7 +29,6 @@ describe('cobertura de validación en rutas', () => {
         const routes = [
             [authRouter, 'post', '/login'],
             [userRouter, 'post', '/'],
-            [userRouter, 'get', '/nick'],
             [userRouter, 'put', '/:id'],
             [userRouter, 'delete', '/:id'],
             [userRouter, 'get', '/search/:searchTerm'],
@@ -37,7 +37,6 @@ describe('cobertura de validación en rutas', () => {
             [groupRouter, 'put', '/:id'],
             [groupRouter, 'delete', '/:id'],
             [groupRouter, 'get', '/'],
-            [groupRouter, 'get', '/mygroups'],
             [debtRouter, 'post', '/'],
             [debtRouter, 'put', '/:id'],
             [debtRouter, 'put', '/pay/:id'],
@@ -57,6 +56,7 @@ describe('cobertura de validación en rutas', () => {
 
     it('valida todas las rutas que reciben parámetros', () => {
         const routes = [
+            [userRouter, 'get', '/by-nickname/:nickname'],
             [userRouter, 'get', '/search/:searchTerm'],
             [userRouter, 'get', '/:id'],
             [userRouter, 'put', '/:id'],

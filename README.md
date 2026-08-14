@@ -1,827 +1,179 @@
 # AhoritaPago API
 
-API REST para gestionar deudas entre amigos, familiares o integrantes de un
-grupo. Permite registrar usuarios, crear grupos, distribuir deudas, consultar
-saldos, marcar pagos y revisar el historial de obligaciones activas y pagadas.
-
-Versión actual: **2.0.0**.
+API REST para administrar usuarios, grupos y deudas compartidas. La interfaz
+HTTP soportada se publica exclusivamente bajo `/api/v2` y responde en JSON.
 
 ## Funcionalidades
 
 - Registro e inicio de sesión con JWT.
-- Contraseñas cifradas con `bcryptjs`.
-- Creación de grupos con administrador, integrantes y código único.
-- Incorporación de personas al grupo por nickname.
-- Creación de una deuda independiente por cada deudor.
-- Saldos derivados de las deudas activas:
-  - `owe`: valor que debe el usuario.
-  - `owes`: valor que le deben al usuario.
-- Pago y eliminación de deudas con transacciones de MongoDB.
+- Creación y administración de grupos.
+- Incorporación de integrantes por cualquier miembro del grupo.
+- Creación, consulta, actualización, pago y eliminación de deudas.
 - Historial separado entre deudas activas y pagadas.
-- Autorización por propietario, integrante, administrador, acreedor y deudor.
+- Resumen financiero y saldos calculados desde las deudas activas.
+- Paginación y ordenamiento de listados desde MongoDB.
 
 ## Tecnologías
 
-- Node.js y CommonJS.
-- Express.
+- Node.js y Express.
 - MongoDB y Mongoose.
-- JSON Web Tokens.
-- bcryptjs.
-- express-validator.
-- Helmet y CORS configurable para seguridad HTTP.
-- express-rate-limit, preparado para habilitarse por entorno.
-- Node Test Runner para pruebas automatizadas.
+- JSON Web Tokens para autenticación.
+- bcryptjs para hash de contraseñas.
+- express-validator para validación HTTP.
+- Helmet, CORS y express-rate-limit para seguridad transversal.
+- `node:test` para pruebas automatizadas.
 
 ## Requisitos
 
-- Node.js 20.6 o superior.
+- Node.js 20 o superior recomendado.
 - npm.
-- MongoDB con soporte para transacciones:
-  - MongoDB Atlas, o
-  - una instalación configurada como replica set.
-
-Una instancia local de MongoDB en modo standalone no puede ejecutar las
-transacciones utilizadas al crear, pagar o eliminar deudas.
+- MongoDB accesible mediante `mongodb://` o `mongodb+srv://`.
+- MongoDB configurado como replica set para las operaciones transaccionales.
 
 ## Instalación local
 
-Instala exactamente las versiones registradas en `package-lock.json`:
-
 ```bash
-npm ci
+npm install
 ```
 
-Usa `npm install` únicamente cuando agregues, elimines o actualices una
-dependencia y conserva el cambio resultante de `package-lock.json`.
+Copia `.env.example` como `.env` y reemplaza los valores necesarios:
 
-Copia la plantilla de variables de entorno:
-
-```powershell
-Copy-Item .env.example .env
+```env
+PORT=3000
+DATABASE_URL=mongodb://127.0.0.1:27017/ahoritapago?replicaSet=rs0
+JWT_SECRET=un-secreto-aleatorio-de-al-menos-32-caracteres
 ```
 
-Completa los valores de `.env` y ejecuta la API:
+Inicia la API en desarrollo:
 
 ```bash
 npm run dev
 ```
 
-El valor de ejemplo de `JWT_SECRET` es rechazado intencionalmente y debe
-reemplazarse antes de iniciar.
-
-La API utiliza el puerto indicado en `PORT`.
-El puerto solo se abre después de establecer correctamente la conexión con
-MongoDB. Si la conexión falla, la aplicación informa el error y no acepta
-solicitudes HTTP.
-
-### Instalación de producción
-
-Las dependencias utilizadas solo durante el desarrollo se excluyen con:
+O ejecútala sin recarga automática:
 
 ```bash
-npm ci --omit=dev
 npm start
 ```
 
-`nodemon` pertenece a `devDependencies` y se usa exclusivamente mediante
-`npm run dev`. El servidor de producción se ejecuta directamente con Node.
-`package-lock.json` se mantiene versionado para que desarrollo, integración
-continua y producción resuelvan el mismo árbol de dependencias.
+La configuración se valida completamente antes de construir la aplicación. Si
+falta `PORT`, `DATABASE_URL` o `JWT_SECRET`, el proceso termina con el código
+`INVALID_CONFIGURATION` sin iniciar parcialmente el servidor.
 
 ## Variables de entorno
 
 | Variable | Descripción |
 |---|---|
-| `PORT` | Obligatoria. Entero entre `1` y `65535`. |
-| `DATABASE_URL` | Obligatoria. URI que empieza por `mongodb://` o `mongodb+srv://`. |
-| `JWT_SECRET` | Obligatoria. Mínimo 32 caracteres, sin espacios externos y distinta del valor de ejemplo. |
-| `CORS_ALLOW_LOCALHOST` | Permite orígenes HTTP/HTTPS en `localhost`, `127.0.0.1` y `::1`, sin restringir el puerto. Por defecto: `true`. |
-| `CORS_ALLOWED_ORIGINS` | Lista de orígenes autorizados separados por coma, sin rutas. |
-| `JSON_BODY_LIMIT` | Tamaño máximo de un cuerpo JSON. Por defecto: `100kb`. |
-| `RATE_LIMIT_ENABLED` | Activa los límites global, de login y de registro. Por defecto: `false`. |
-| `TRUST_PROXY_HOPS` | Cantidad de proxies confiables delante de Express. Solo se aplica si el rate limiting está activo. Por defecto: `0`. |
-| `GLOBAL_RATE_LIMIT_WINDOW_MS` | Ventana del límite general en milisegundos. Por defecto: `900000`. |
-| `GLOBAL_RATE_LIMIT_MAX` | Solicitudes generales permitidas por ventana. Por defecto: `500`. |
-| `LOGIN_RATE_LIMIT_WINDOW_MS` | Ventana del límite de login. Por defecto: `900000`. |
-| `LOGIN_RATE_LIMIT_MAX` | Intentos fallidos de login permitidos por ventana. Por defecto: `15`. |
-| `REGISTRATION_RATE_LIMIT_WINDOW_MS` | Ventana del límite de registro. Por defecto: `3600000`. |
-| `REGISTRATION_RATE_LIMIT_MAX` | Registros permitidos por ventana. Por defecto: `10`. |
-| `LEGACY_API_ENABLED` | Monta temporalmente `/api/*`. Por defecto: `true`. Cambiar a `false` solo después de completar la migración. |
-| `LEGACY_API_LOG_USAGE` | Registra eventos estructurados de consumo legacy. Por defecto: `true`. |
-| `LEGACY_API_DEPRECATION_DATE` | Fecha ISO 8601 anunciada en `Deprecation`. Por defecto: `2026-08-13T00:00:00.000Z`. |
-| `LEGACY_API_SUNSET_DATE` | Fecha ISO 8601 de retiro anunciada en `Sunset`. Por defecto: `2027-02-01T00:00:00.000Z`. |
+| `PORT` | Puerto HTTP, entre 1 y 65535. |
+| `DATABASE_URL` | URI válida de MongoDB. |
+| `JWT_SECRET` | Secreto JWT de al menos 32 caracteres. |
+| `CORS_ALLOW_LOCALHOST` | Permite orígenes locales cuando vale `true`. |
+| `CORS_ALLOWED_ORIGINS` | Orígenes HTTP/HTTPS permitidos, separados por comas. |
+| `JSON_BODY_LIMIT` | Tamaño máximo del body JSON. Valor predeterminado: `100kb`. |
+| `RATE_LIMIT_ENABLED` | Activa los límites por IP cuando vale `true`. |
+| `TRUST_PROXY_HOPS` | Cantidad de proxies confiables. Valor predeterminado: `0`. |
+| `GLOBAL_RATE_LIMIT_WINDOW_MS` | Ventana del límite general en milisegundos. |
+| `GLOBAL_RATE_LIMIT_MAX` | Solicitudes generales permitidas por ventana. |
+| `LOGIN_RATE_LIMIT_WINDOW_MS` | Ventana del límite de login. |
+| `LOGIN_RATE_LIMIT_MAX` | Intentos de login permitidos por ventana. |
+| `REGISTRATION_RATE_LIMIT_WINDOW_MS` | Ventana del límite de registro. |
+| `REGISTRATION_RATE_LIMIT_MAX` | Registros permitidos por ventana. |
 
-No se debe versionar el archivo `.env` ni usar el valor de ejemplo de
-`JWT_SECRET` en un entorno real.
-
-Los booleanos opcionales solo aceptan `true` o `false`. Los límites y ventanas
-deben ser enteros positivos, salvo `TRUST_PROXY_HOPS`, que también admite
-`0`. `JSON_BODY_LIMIT` acepta tamaños positivos en `b`, `kb` o `mb`.
-`CORS_ALLOWED_ORIGINS` acepta orígenes HTTP/HTTPS separados por coma, sin
-rutas, credenciales, query ni fragmentos. La fecha de `Sunset` debe ser
-posterior a la fecha de deprecación.
-
-### Validación al iniciar
-
-La configuración se carga y valida antes de importar y construir el servidor:
-
-```text
-.env
-  |
-  v
-Configuración validada
-  |
-  +--> Puerto
-  +--> Conexión MongoDB
-  +--> JWT
-  `--> Seguridad HTTP
-  |
-  v
-Composition root y Server
-  |
-  v
-MongoDB -> puerto HTTP
-```
-
-Si una o más variables son inválidas, la API informa todas sus reglas
-incumplidas, asigna un código de salida de error y no construye Express, no
-intenta conectarse a MongoDB y no abre el puerto. Los valores recibidos y el
-contenido de `JWT_SECRET` nunca se incluyen en el error.
-
-Antes de desplegar una actualización en Render, comprueba especialmente que
-el secreto configurado tenga al menos 32 caracteres. Un valor inválido hará
-que el servicio falle inmediatamente, en lugar de iniciar parcialmente.
+Los límites por IP y `trust proxy` permanecen apagados con la configuración de
+`.env.example`, adecuada para pruebas locales. CORS permite localhost y puede
+recibir orígenes adicionales mediante `CORS_ALLOWED_ORIGINS`.
 
 ## Scripts
 
-```bash
-npm run dev
-```
-
-Inicia la API con Nodemon y carga `.env`.
-
-```bash
-npm start
-```
-
-Inicia la API con Node y carga `.env`.
-
-```bash
-npm test
-```
-
-Ejecuta una vez todas las pruebas automatizadas.
-
-```bash
-npm run test:watch
-```
-
-Ejecuta las pruebas en modo observación durante el desarrollo.
-
-```bash
-npm run audit:data
-```
-
-Ejecuta una auditoría de solo lectura sobre las deudas existentes y los índices
-de grupos. Requiere `DATABASE_URL` y genera un reporte JSON; no modifica
-documentos ni elimina índices.
+| Comando | Uso |
+|---|---|
+| `npm start` | Inicia la aplicación. |
+| `npm run dev` | Inicia con nodemon. |
+| `npm test` | Ejecuta todas las pruebas automatizadas. |
+| `npm run test:watch` | Ejecuta las pruebas en modo observación. |
+| `npm run audit:data` | Audita integridad de usuarios, grupos, deudas e índices. |
+| `npm run migrate:balances:dry-run` | Simula la eliminación de saldos persistidos. |
+| `npm run migrate:balances` | Elimina `owe` y `owes` persistidos en usuarios. |
 
 ## Arquitectura
 
-El proyecto es un monolito modular organizado por capas:
-
-```text
-Cliente HTTP
-    |
-    v
-Routes
-    |
-    +--> Middlewares de autenticación y validación
-    |
-    v
-Controllers
-    |
-    v
-Services
-    |
-    v
-Repositories
-    |
-    v
-Mongoose / MongoDB
-```
-
-Si cualquier middleware, controlador, servicio o repositorio produce una
-excepción, esta se propaga hacia un único middleware global:
-
-```text
-Error de aplicación
-        |
-        v
-Normalización del error
-        |
-        +--> Error esperado: conserva estado, código y mensaje
-        |
-        `--> Error interno: registra el detalle y oculta información sensible
-        |
-        v
-Respuesta JSON uniforme
-```
-
-Responsabilidad de cada carpeta:
+El proyecto separa la interfaz HTTP, la lógica de aplicación y la
+infraestructura:
 
 ```text
 src/
-├── adapters/      Implementaciones de infraestructura para contratos internos
-├── audits/        Consultas no destructivas de integridad de datos
-├── config/        Valores configurables y límites de la aplicación
-├── controllers/   Traducción entre HTTP y los casos de uso
-├── db/            Conexión con MongoDB
-├── dtos/          Contratos de entrada para controladores
-├── helpers/       Utilidades y errores HTTP
-├── middlewares/   JWT y validación de formularios
-├── models/        Esquemas de Mongoose y servidor Express
-├── repositories/  Consultas y escrituras en MongoDB
-├── routes/        Definición de endpoints
-├── services/      Reglas de negocio y autorización
-└── validators/    Validación y sanitización de solicitudes
-
-test/
-├── audits/        Pruebas de reportes de integridad
-├── middlewares/   Pruebas de autenticación
-├── models/        Pruebas de restricciones de esquemas
-├── routes/        Pruebas de protección y orden de rutas
-└── services/      Pruebas de reglas de negocio
+├── adapters/          # Adaptadores de infraestructura y transacciones
+├── config/            # Configuración validada y políticas compartidas
+├── controllers/v2/    # Adaptación de casos de uso al contrato HTTP v2
+├── db/                # Conexión a MongoDB
+├── dtos/              # DTO de entrada y salida
+├── helpers/           # Errores y utilidades puras
+├── middlewares/       # Autenticación, validación, errores y seguridad HTTP
+├── models/            # Esquemas Mongoose y servidor Express
+├── repositories/      # Contratos de persistencia sobre Mongoose
+├── routes/            # Routers compartidos y router v2 de usuarios
+├── services/          # Casos de uso y reglas de negocio
+├── validators/        # Reglas del límite HTTP
+└── compositionRoot.js # Construcción del grafo de dependencias
 ```
 
-### Inyección de dependencias y composition root
-
-La aplicación ensambla todas sus dependencias de ejecución en
-`src/compositionRoot.js`:
-
-```text
-Repositorios + infraestructura
-              |
-              v
-          Servicios
-              |
-              v
-         Controladores
-              |
-              v
-            Routers
-              |
-              v
-            Server
-```
-
-El composition root construye e inyecta:
-
-- configuración validada de servidor, base de datos, JWT y seguridad HTTP;
-- repositorios de usuarios, grupos y deudas;
-- bcrypt como proveedor de contraseñas;
-- JWT y la función que obtiene el secreto;
-- un administrador de transacciones implementado mediante Mongoose;
-- servicios, middleware de autenticación, controladores y routers.
-
-Los servicios no reciben estas dependencias desde variables globales dentro de
-su lógica. Se construyen mediante fábricas ubicadas en
-`src/services/factories/` y `src/services/debt/`. El composition root importa
-las fábricas puras de controladores, routers y middleware desde:
-
-```text
-src/controllers/factories/
-src/routes/factories/
-src/middlewares/factories/
-```
-
-Importar esos módulos solo expone funciones de construcción: no carga
-servicios predeterminados, no crea routers y no genera un segundo grafo de
-dependencias. Las instancias se construyen únicamente al ejecutar
-`createCompositionRoot()`.
-
-### API interna oficial desde 2.0.0
-
-La versión 2.0.0 retiró las fachadas que construían instancias predeterminadas.
-Los módulos oficiales son `src/compositionRoot.js` y las fábricas ubicadas en
-los directorios `factories/`. Ya no son válidos imports como:
+`src/compositionRoot.js` es el único lugar que ensambla repositorios, servicios,
+controladores, middleware y routers. Su superficie HTTP contiene únicamente:
 
 ```js
-require('./src/controllers/user');
-require('./src/routes/user');
-require('./src/services/userService');
-require('./src/middlewares/authVerify');
+root.controllers.v2
+root.routers.v2
 ```
 
-Un consumidor que necesite construir una pieza aislada debe importar su
-fábrica explícita; la aplicación completa debe obtenerse mediante
-`createCompositionRoot()`. Este es un cambio incompatible para imports
-internos directos, pero no modifica las rutas ni los contratos HTTP de la API.
-La guía de migración completa está en `CHANGELOG.md`.
+Los servicios reciben sus dependencias por inyección. Los casos de uso de deuda
+dependen de un `transactionManager` con `runInTransaction(work)`, no de sesiones
+de Mongoose directamente. El adaptador traduce el contexto transaccional a la
+sesión utilizada por los repositorios.
 
-### Contratos de repositorios
+## Contrato HTTP
 
-Los tres repositorios utilizan la misma convención de nombres:
-
-- `find...` para recuperar registros;
-- `count...` para contar registros sin cargarlos en memoria;
-- `exists...` para comprobaciones booleanas de existencia;
-- `create` para inserciones;
-- `updateById` para actualizaciones;
-- `deactivateById` para eliminaciones lógicas;
-- `deleteById` solo cuando la eliminación es física.
-
-Todas las operaciones aceptan un objeto `options` como último argumento. El
-contexto genérico se entrega como `{ transaction }`; los repositorios lo
-traducen a la sesión que necesita Mongoose. No se usan argumentos posicionales
-distintos entre repositorios. Los filtros forman parte del nombre del método:
-por ejemplo, `findActiveById`, `findActiveByDebtor` y
-`findActiveByParticipantAndGroup` hacen explícito si se consultan registros
-activos. Los listados reciben objetos de consulta con página y límite; el
-repositorio aplica filtro, ordenamiento y paginación antes de recuperar
-documentos.
-
-### Administrador de transacciones
-
-Los casos de uso dependen únicamente de este contrato:
-
-```js
-transactionManager.runInTransaction(work)
-```
-
-`work` recibe un contexto transaccional opaco que puede propagarse a otros
-servicios y repositorios. El adaptador
-`src/adapters/mongooseTransactionManager.js` es el único responsable de abrir
-la sesión, ejecutar `withTransaction` y cerrar la sesión incluso cuando ocurre
-un error. De esta forma, crear, pagar o eliminar deudas y desactivar usuarios
-no depende de la API concreta de Mongoose.
-
-Las operaciones de persistencia también quedan dentro del repositorio. Por
-ejemplo, el servicio de grupos usa `addMemberById` y no modifica documentos de
-Mongoose ni ejecuta `save()` directamente. Este contrato permite reemplazar
-un repositorio desde el composition root sin que el caso de uso conozca los
-detalles de MongoDB.
-
-`Server` acepta opcionalmente `compositionRoot`, `connection` y `port`, lo que
-permite probar su arranque sin modificar `require.cache`. No existen módulos
-alternativos que construyan controladores, routers o servicios predeterminados.
-
-### Casos de uso de deudas
-
-El dominio de deudas está dividido por operación para que cada módulo tenga
-una única razón de cambio:
+Base soportada:
 
 ```text
-src/services/debt/
-    ├── createDebtService.js       Ensamblaje de los casos de uso
-    ├── debtAccess.js              Identidad, participación y búsqueda común
-    ├── createDebt.js              Creación transaccional
-    ├── deleteDebt.js              Eliminación autorizada
-    ├── getAllDebts.js             Listado de deudas activas
-    ├── getDebtById.js             Consulta autorizada por ID
-    ├── getDebtHistoryForUser.js   Historial activo y pagado
-    ├── getDebtSummaryForUser.js   Resumen de deudas y créditos
-    ├── getDebtsForUserInGroupByCode.js
-    ├── markAsPaid.js              Pago transaccional
-    └── updateDebt.js              Actualización autorizada
+/api/v2
 ```
 
-El composition root crea el servicio de deudas y lo inyecta en la fábrica pura
-del controlador. No existe una instancia predeterminada construida al importar
-el módulo.
+Una respuesta exitosa usa este envelope:
 
-El servicio de balance se construye por separado en
-`src/services/balance/createBalanceService.js`. Consulta el repositorio de
-deudas y enriquece las respuestas públicas del usuario. El servicio de deudas
-ya no depende del servicio de usuarios:
-
-```text
-UserService -> BalanceService -> DebtRepository
-DebtService ------------------> DebtRepository
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Mensaje opcional",
+  "meta": {}
+}
 ```
+
+`message` y `meta` solo aparecen cuando el endpoint los necesita. Los errores
+también tienen un contrato uniforme:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Los datos enviados no son válidos.",
+    "details": []
+  }
+}
+```
+
+Los errores internos no exponen mensajes técnicos, credenciales ni valores de
+entrada sensibles.
 
 ## Autenticación
 
-Después de iniciar sesión, las rutas protegidas requieren:
+### Login
 
 ```http
-Authorization: Bearer <token>
+POST /api/v2/auth/login
+Content-Type: application/json
 ```
-
-El JWT dura cuatro horas e incluye `userId` y `nick`. En cada solicitud
-protegida también se comprueba que el usuario todavía exista y tenga
-`state: true`; desactivar una cuenta invalida inmediatamente sus tokens aunque
-no hayan expirado.
-
-Solo estas operaciones son públicas:
-
-- `POST /api/auth/login`
-- `POST /api/user`
-
-Las demás rutas de usuarios, grupos y deudas requieren un JWT válido.
-
-## Seguridad HTTP
-
-La API aplica Helmet antes de las rutas para agregar encabezados defensivos y
-ocultar `X-Powered-By`. También limita explícitamente el cuerpo JSON; si se
-supera `JSON_BODY_LIMIT`, responde `413` con el código
-`PAYLOAD_TOO_LARGE`.
-
-CORS ya no autoriza indiscriminadamente todos los orígenes. Durante el
-desarrollo, `CORS_ALLOW_LOCALHOST=true` permite consumir la API desplegada en
-Render desde un frontend local en cualquier puerto. Los clientes que no son
-navegadores y no envían el encabezado `Origin` continúan permitidos. Para un
-frontend desplegado, su origen completo debe agregarse a
-`CORS_ALLOWED_ORIGINS`; por ejemplo:
-
-```env
-CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
-```
-
-### Estado temporal de los límites por IP
-
-En la fase actual se conserva:
-
-```env
-RATE_LIMIT_ENABLED=false
-TRUST_PROXY_HOPS=0
-```
-
-Con esta configuración no se monta ningún rate limiter, no se contabilizan ni
-bloquean direcciones IP, no se generan respuestas `429` y Express mantiene
-`trust proxy=false`. Los valores globales, de login y de registro quedan
-preparados, pero no tienen efecto hasta activar explícitamente la función.
-
-Cuando se vaya a habilitar en Render, primero se debe comprobar la cadena real
-de proxies y definir `TRUST_PROXY_HOPS` con ese valor. Una configuración
-incorrecta puede hacer que varias personas compartan un mismo contador o que
-un cliente manipule la IP utilizada. Después se puede establecer
-`RATE_LIMIT_ENABLED=true` y probar login, registro y tráfico general desde el
-frontend real. El almacenamiento incluido es local al proceso; si se ejecutan
-varias instancias de la API, se debe configurar posteriormente un almacén
-compartido para que el conteo sea consistente entre ellas.
-
-## Validación y DTO de entrada
-
-Los controladores no consumen directamente `req.body`, `req.params` o
-`req.query`. Antes de ejecutar un caso de uso, la solicitud atraviesa este
-flujo:
-
-```text
-Campos permitidos
-        |
-        v
-Validación y sanitización
-        |
-        v
-DTO de entrada
-        |
-        v
-Controlador y servicio
-```
-
-Los textos se recortan con `trim`, los parámetros `:id` se validan como
-ObjectId y el valor de una deuda válida se convierte a número. Los DTO crean
-objetos nuevos y únicamente conservan los campos declarados para la operación.
-Los términos de búsqueda admiten entre 2 y 50 caracteres y sus símbolos de
-expresión regular se escapan para tratarlos como texto literal.
-
-Política de identidad de usuarios:
-
-- `name` admite entre 2 y 80 caracteres. Se eliminan los espacios exteriores
-  y los espacios internos consecutivos se convierten en uno solo.
-- `nickname` admite entre 1 y 50 caracteres. Solo se eliminan espacios
-  exteriores; no se cambia su estructura ni su capitalización.
-- `email` admite como máximo 254 caracteres. Solo se eliminan espacios
-  exteriores y se conserva su capitalización.
-- Una contraseña nueva debe tener al menos 8 caracteres. No se exigen
-  mayúsculas, números, símbolos ni una longitud máxima, y su contenido no se
-  recorta ni transforma.
-- El login no aplica retroactivamente el mínimo de 8 caracteres, por lo que una
-  cuenta histórica con una contraseña más corta puede seguir autenticándose.
-
-Email y nickname son identidades sensibles a mayúsculas. Por ejemplo,
-`leon` y `LEON` son nicknames diferentes; `lomasFresa@gmail.com` y
-`lomasfresa@gmail.com` también son correos diferentes. El login y las búsquedas
-exactas deben utilizar la misma capitalización con la que se registró la cuenta.
-Los índices únicos de MongoDB conservan esta misma comparación exacta.
-
-Contratos de body:
-
-| Operación | Campos permitidos |
-|---|---|
-| Login | `email`, `password` |
-| Registrar usuario | `name`, `nickname`, `email`, `password` |
-| Buscar por nickname | `nick` |
-| Actualizar usuario | `name`, `nickname`, `email` |
-| Crear grupo | `name` |
-| Actualizar grupo | `name` |
-| Agregar integrante | `groupCode`, `userNick` |
-| Crear deuda | `description`, `value`, `group`, `debtor` |
-| Actualizar deuda | `description` |
-| Pagar o eliminar recursos | Ninguno |
-
-Si el cliente envía un campo fuera del contrato, la API responde `400` con
-el código `UNKNOWN_FIELDS`. Campos internos o calculados como `state`, `owe`,
-`owes`, `creditor`, `debtDate` y `paymentDate` nunca forman parte de los DTO de
-entrada públicos.
-
-La validación HTTP comprueba estructura, tipos y formatos. Las reglas que
-dependen del estado de la aplicación permanecen en los servicios; por ejemplo,
-pertenencia al grupo, permisos del acreedor y estado de pago de una deuda.
-
-## Reglas de autorización
-
-### Usuarios
-
-- El registro público solo acepta `name`, `nickname`, `email` y `password`.
-  Los saldos se calculan en el servidor y el estado conserva su valor interno.
-- Un usuario puede consultar, modificar y desactivar únicamente su perfil.
-- Un usuario no puede desactivar su cuenta mientras participe como acreedor o
-  deudor en alguna deuda activa. La API responde `409` con el código
-  `USER_HAS_ACTIVE_DEBTS` hasta que esas obligaciones se paguen o eliminen.
-- La edición del perfil permite `name`, `nickname` y `email`.
-- `owe`, `owes`, `state` y `password` no se pueden modificar directamente.
-  `owe` y `owes` se incluyen en el perfil como campos calculados.
-
-### Grupos
-
-- Los nombres son descriptivos y pueden repetirse entre grupos. El código es
-  el identificador público único.
-- Al crear un grupo se realizan hasta cinco intentos para generar un código
-  disponible. Cada código se consulta nuevamente y el índice único de MongoDB
-  resuelve posibles colisiones concurrentes antes de reintentar.
-- Los integrantes pueden consultar el grupo y agregar personas.
-- Solo el administrador puede modificar o eliminar el grupo.
-- Un usuario externo no puede consultar ni administrar el grupo.
-
-### Deudas
-
-- La entrada HTTP acepta uno o más deudores diferentes al acreedor y un valor
-  finito mayor que cero. El servicio crea un documento independiente por cada
-  persona y Mongoose exige exactamente un deudor en cada documento persistido.
-- Acreedor y deudor pueden consultar la deuda.
-- Solo el acreedor puede modificar su descripción o eliminarla.
-- Acreedor y deudor pueden marcarla como pagada.
-- El acreedor y todos los deudores deben pertenecer al grupo.
-
-## Modelos principales
-
-### User
-
-| Campo | Descripción |
-|---|---|
-| `name` | Nombre del usuario. |
-| `nickname` | Identificador público único y sensible a mayúsculas. |
-| `email` | Correo único y sensible a mayúsculas. |
-| `password` | Contraseña cifrada; las nuevas requieren mínimo 8 caracteres. |
-| `state` | Estado activo del usuario. |
-
-`owe` y `owes` no se almacenan en `User`. Se agregan a las respuestas de
-perfil calculando las deudas con `state: true`, por lo que las deudas son la
-única fuente de verdad financiera.
-
-### Group
-
-| Campo | Descripción |
-|---|---|
-| `name` | Nombre descriptivo; puede repetirse. |
-| `admin` | Usuario administrador. |
-| `members` | Integrantes del grupo. |
-| `code` | Código único del grupo. |
-| `state` | Estado activo del grupo. |
-
-### Debt
-
-| Campo | Descripción |
-|---|---|
-| `description` | Concepto de la deuda. |
-| `creditor` | Usuario al que le deben. |
-| `debtor` | Arreglo con el único deudor de ese documento. |
-| `value` | Valor adeudado en ese documento. |
-| `group` | Grupo asociado. |
-| `debtDate` | Fecha de creación. |
-| `paymentDate` | Fecha de pago. |
-| `state` | `true` si está activa y `false` si está pagada. |
-
-## Auditoría de integridad
-
-Después de endurecer un esquema, Mongoose protege las escrituras nuevas pero
-no corrige automáticamente los documentos históricos. Antes de limpiar datos,
-ejecuta:
-
-```bash
-npm run audit:data
-```
-
-El reporte identifica:
-
-- deudas sin acreedor o sin deudores;
-- documentos que no contienen exactamente un deudor;
-- elementos nulos y deudores repetidos;
-- acreedores incluidos como deudores;
-- valores ausentes, no numéricos, iguales a cero o negativos;
-- diferencias entre los antiguos `owe` y `owes` y los saldos derivados;
-- participantes de deudas que no tienen un usuario asociado;
-- nombres, nicknames o correos que incumplen los límites vigentes;
-- nombres con espacios no normalizados y correos o nicknames con espacios
-  exteriores heredados;
-- correos con formato inválido;
-- índices globales únicos heredados sobre `Group.name`.
-
-La auditoría no realiza escrituras. Un índice heredado `name_1` puede seguir
-impidiendo nombres repetidos aunque el esquema actual no lo declare. Su
-eliminación y cualquier corrección de documentos debe hacerse por separado,
-con respaldo previo y después de revisar el reporte.
-
-### Retiro de los saldos heredados
-
-El código de la API ya no lee ni actualiza `User.owe` y `User.owes`. Los campos
-pueden permanecer temporalmente en documentos históricos para permitir una
-transición controlada. Antes de eliminarlos, ejecuta la simulación:
-
-```bash
-npm run migrate:balances:dry-run
-```
-
-La simulación solo cuenta los documentos afectados. Para realizar la escritura
-se requieren simultáneamente el indicador `--execute`, incluido por el script
-de npm, y esta confirmación exacta:
-
-```env
-CONFIRM_REMOVE_DERIVED_BALANCES=REMOVE_DERIVED_BALANCES
-```
-
-```bash
-npm run migrate:balances
-```
-
-No ejecutes la migración hasta comprobar que `npm run audit:data` no reporta
-deudas incompatibles, crear un respaldo y desplegar primero la versión que
-calcula los saldos. Para una reversión segura, pausa las escrituras durante la
-ventana de migración; antes de volver a una versión que persista saldos, restaura
-el respaldo o reconstruye ambos campos desde las deudas activas.
-
-## API HTTP v2
-
-La versión uniforme se publica bajo `/api/v2`. Los endpoints sin versión se
-mantienen temporalmente para que el frontend pueda migrar sin interrumpir el
-servicio desplegado. Ambas versiones comparten los mismos servicios,
-repositorios, autenticación y reglas de negocio.
-
-Toda respuesta exitosa v2 contiene `success` y `data`:
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "RESOURCE_ID"
-  }
-}
-```
-
-Los listados y resultados paginados colocan la información auxiliar en `meta`:
-
-```json
-{
-  "success": true,
-  "data": [],
-  "meta": {
-    "count": 0,
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "totalPages": 0,
-      "hasNextPage": false,
-      "hasPreviousPage": false
-    }
-  }
-}
-```
-
-`message` es opcional y se utiliza en operaciones de escritura. Una eliminación
-exitosa conserva el envelope y responde con `data: null`. Los errores utilizan
-el contrato global existente con `success: false` y `error`.
-
-Los DTO de salida v2 convierten `_id` en `id`, eliminan `__v`, nunca exponen la
-contraseña y normalizan las referencias de usuario, grupo y deuda.
-
-### Rutas v2
-
-| Recurso | Prefijo |
-|---|---|
-| Autenticación | `/api/v2/auth` |
-| Usuarios | `/api/v2/user` |
-| Grupos | `/api/v2/group` |
-| Deudas | `/api/v2/payment` |
-
-La búsqueda exacta por nickname no utiliza un body GET:
-
-```http
-GET /api/v2/user/by-nickname/leon
-Authorization: Bearer <token>
-```
-
-El nickname se valida y obtiene del parámetro `:nickname`. La búsqueda parcial
-continúa disponible en
-`GET /api/v2/user/search/:searchTerm?page=1&limit=20`.
-
-El historial v2 separa datos y metadatos:
-
-```json
-{
-  "success": true,
-  "data": {
-    "active": [],
-    "paid": []
-  },
-  "meta": {
-    "count": {
-      "total": 0,
-      "active": 0,
-      "paid": 0
-    },
-    "pagination": {
-      "active": {},
-      "paid": {}
-    }
-  }
-}
-```
-
-Los demás listados activos también están paginados:
-
-```http
-GET /api/v2/group?page=1&limit=20
-GET /api/v2/payment?page=1&limit=20
-GET /api/v2/payment/group/ABC123?page=1&limit=20
-GET /api/v2/payment/summary?debtsPage=1&creditsPage=1&limit=20
-```
-
-Los tres primeros utilizan una sola entrada `meta.pagination`. El resumen
-mantiene páginas independientes en `meta.pagination.debts` y
-`meta.pagination.credits`; sus conteos totales están en `meta.count`.
-
-### Migración desde endpoints sin versión
-
-| Endpoint temporal | Endpoint v2 |
-|---|---|
-| `POST /api/auth/login` | `POST /api/v2/auth/login` |
-| `/api/user` | `/api/v2/user` |
-| `GET /api/user/nick` con body | `GET /api/v2/user/by-nickname/:nickname` |
-| `/api/group` | `/api/v2/group` |
-| `/api/payment` | `/api/v2/payment` |
-
-Al migrar el frontend debe leerse el recurso desde `response.data.data` si la
-librería HTTP conserva la respuesta completa, o desde `body.data` al trabajar
-directamente con `fetch`. Los conteos y la paginación pasan a `body.meta`.
-
-Los listados legacy que históricamente devolvían un arreglo (`/api/group` y
-`/api/payment`) conservan ese body durante la transición, pero ahora entregan
-como máximo una página. Sus metadatos se publican en `X-Total-Count`, `X-Page`,
-`X-Limit` y `X-Total-Pages`; estos encabezados están expuestos mediante CORS.
-
-Los endpoints sin versión están deprecados desde el **13 de agosto de 2026** y
-su `Sunset` está programado para el **1 de febrero de 2027 a las 00:00 UTC**.
-Mientras permanezcan activos agregan:
-
-```http
-Deprecation: @1786579200
-Link: </api/v2/...>; rel="successor-version"
-Sunset: Mon, 01 Feb 2027 00:00:00 GMT
-```
-
-Cada respuesta legacy genera en los logs de Render un evento JSON con
-`event: "legacy_api_request"`, método, ruta, sucesor, estado HTTP, origen y
-user-agent. No registra JWT, body, query, ID de usuario ni dirección IP.
-
-### Criterios para retirar legacy
-
-1. Desplegar el frontend usando exclusivamente `/api/v2`.
-2. Buscar `legacy_api_request` en los logs y clasificar los consumidores por
-   ruta, origen y user-agent.
-3. Mantener al menos 30 días consecutivos sin tráfico legacy de consumidores
-   conocidos antes del `Sunset`.
-4. Comunicar el `Sunset` a cualquier consumidor externo identificado.
-5. Configurar `LEGACY_API_ENABLED=false` y verificar que v2 continúa operando.
-6. Monitorear errores durante siete días y después eliminar físicamente routers
-   y controladores legacy en una versión mayor.
-
-Si todavía existe tráfico legítimo cerca de la fecha, se puede mover
-`LEGACY_API_SUNSET_DATE` a una fecha posterior y volver a desplegar. No debe
-desactivarse legacy silenciosamente antes de anunciar el nuevo plazo.
-
-## Endpoints legacy
-
-Todas las rutas, excepto registro y login, requieren JWT.
-
-### Autenticación
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| `POST` | `/api/auth/login` | Inicia sesión y devuelve un JWT. |
-
-Ejemplo:
 
 ```json
 {
@@ -830,85 +182,69 @@ Ejemplo:
 }
 ```
 
-### Usuarios
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| `POST` | `/api/user` | Registra un usuario. |
-| `GET` | `/api/user` | Consulta el perfil del JWT. |
-| `GET` | `/api/user/:id` | Consulta el perfil propio por ID. |
-| `GET` | `/api/user/nick` | Busca un usuario por nickname enviado como `nick`. |
-| `GET` | `/api/user/search/:searchTerm` | Busca nicknames parcialmente con paginación. |
-| `PUT` | `/api/user/:id` | Actualiza el perfil propio. |
-| `DELETE` | `/api/user/:id` | Desactiva el perfil propio. |
-
-Registro:
+Respuesta:
 
 ```json
 {
-  "name": "Laura",
-  "nickname": "laura",
-  "email": "laura@example.com",
-  "password": "contraseña-segura"
+  "success": true,
+  "data": {
+    "token": "jwt"
+  }
 }
 ```
 
-Búsqueda paginada:
+El registro y el login son públicos. Las demás rutas requieren:
 
 ```http
-GET /api/user/search/leo?page=1&limit=20
 Authorization: Bearer <token>
 ```
 
-La respuesta conserva `results` y agrega el total y los metadatos de página:
+El middleware rechaza encabezados ausentes o mal formados, tokens inválidos y
+tokens pertenecientes a usuarios desactivados.
 
-```json
-{
-  "msg": "Resultados de la búsqueda para 'leo'",
-  "count": 21,
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "totalPages": 2,
-    "hasNextPage": true,
-    "hasPreviousPage": false
-  },
-  "results": []
-}
-```
-
-Los resultados se ordenan por `nickname` y luego por `_id`, ambos de forma
-ascendente. `page` empieza en `1`; `limit` utiliza `20` por defecto y admite
-como máximo `50` resultados.
-
-### Grupos
+## Usuarios
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/group` | Lista paginada de grupos del usuario. |
-| `GET` | `/api/group/mygroups` | Alias paginado legacy deprecado; usar `/api/v2/group`. |
-| `GET` | `/api/group/:id` | Consulta un grupo al que pertenece. |
-| `POST` | `/api/group` | Crea un grupo. |
-| `POST` | `/api/group/addMember` | Agrega una persona; puede hacerlo cualquier integrante. |
-| `PUT` | `/api/group/:id` | Modifica el nombre; solo administrador. |
-| `DELETE` | `/api/group/:id` | Desactiva el grupo; solo administrador. |
+| `POST` | `/api/v2/user` | Registra un usuario. |
+| `GET` | `/api/v2/user` | Obtiene el perfil asociado al JWT. |
+| `GET` | `/api/v2/user/:id` | Obtiene el perfil propio por ID. |
+| `GET` | `/api/v2/user/by-nickname/:nickname` | Busca un nickname exacto. |
+| `GET` | `/api/v2/user/search/:searchTerm` | Busca nicknames parcialmente. |
+| `PUT` | `/api/v2/user/:id` | Actualiza el perfil propio. |
+| `DELETE` | `/api/v2/user/:id` | Desactiva el perfil propio. |
 
-`GET /api/group/mygroups` permanece operativo temporalmente y devuelve el mismo
-JSON que `GET /api/group`. Como toda la API legacy, anuncia directamente el
-sucesor v2:
+Body de registro:
 
-```http
-Deprecation: @1786579200
-Link: </api/v2/group>; rel="successor-version"
-Sunset: Mon, 01 Feb 2027 00:00:00 GMT
+```json
+{
+  "name": "Laura Gómez",
+  "nickname": "Laura",
+  "email": "Laura@example.com",
+  "password": "12345678"
+}
 ```
 
-El listado recibe `page` y `limit`, se ordena por `_id` descendente y devuelve
-20 grupos por defecto, con un máximo de 50. El body legacy continúa siendo un
-arreglo y sus totales están disponibles en los encabezados `X-*` descritos
-anteriormente.
+El email y el nickname conservan sus mayúsculas y se comparan de forma exacta.
+Por tanto, `Laura` y `laura`, así como `Laura@example.com` y
+`laura@example.com`, son identidades diferentes. Las contraseñas nuevas solo
+exigen un mínimo de ocho caracteres; no se aplica una regla de composición.
 
-Crear grupo:
+No se puede desactivar un usuario que participe en deudas activas. En ese caso,
+la API responde `409 USER_HAS_ACTIVE_DEBTS`.
+
+## Grupos
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v2/group` | Lista los grupos activos del usuario. |
+| `GET` | `/api/v2/group/:id` | Consulta un grupo al que pertenece. |
+| `POST` | `/api/v2/group` | Crea un grupo. |
+| `POST` | `/api/v2/group/addMember` | Agrega una persona al grupo. |
+| `PUT` | `/api/v2/group/:id` | Actualiza el nombre del grupo. |
+| `DELETE` | `/api/v2/group/:id` | Desactiva el grupo. |
+
+Body de creación:
 
 ```json
 {
@@ -916,325 +252,159 @@ Crear grupo:
 }
 ```
 
-Agregar integrante:
+Body para agregar un integrante:
 
 ```json
 {
   "groupCode": "ABC123",
-  "userNick": "nuevo_integrante"
+  "userNick": "Laura"
 }
 ```
 
-### Deudas y pagos
+Cualquier integrante puede agregar personas. Solo el administrador puede
+actualizar o desactivar el grupo. Los códigos se generan con reintentos
+limitados y un índice único de MongoDB protege frente a colisiones concurrentes.
 
-Estas rutas utilizan el prefijo histórico `/api/payment`, aunque administran
-documentos de deuda.
+## Deudas y pagos
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/payment` | Lista paginada de deudas activas del usuario como deudor. |
-| `GET` | `/api/payment/summary` | Resumen paginado de deudas y créditos activos. |
-| `GET` | `/api/payment/history` | Historial activo y pagado con páginas independientes. |
-| `GET` | `/api/payment/group/:groupCode` | Deudas activas paginadas del usuario en un grupo. |
-| `GET` | `/api/payment/:id` | Consulta una deuda como acreedor o deudor. |
-| `POST` | `/api/payment` | Crea una deuda. |
-| `PUT` | `/api/payment/:id` | Modifica su descripción; solo acreedor. |
-| `PUT` | `/api/payment/pay/:id` | Marca la deuda como pagada. |
-| `DELETE` | `/api/payment/:id` | Elimina la deuda; el saldo derivado se actualiza automáticamente. |
+| `GET` | `/api/v2/payment` | Lista deudas activas del usuario como deudor. |
+| `GET` | `/api/v2/payment/summary` | Resume deudas y créditos activos. |
+| `GET` | `/api/v2/payment/history` | Separa deudas activas y pagadas. |
+| `GET` | `/api/v2/payment/group/:groupCode` | Lista deudas activas del usuario en un grupo. |
+| `GET` | `/api/v2/payment/:id` | Consulta una deuda en la que participa. |
+| `POST` | `/api/v2/payment` | Crea una o varias deudas. |
+| `PUT` | `/api/v2/payment/:id` | Actualiza la descripción. |
+| `PUT` | `/api/v2/payment/pay/:id` | Marca una deuda como pagada. |
+| `DELETE` | `/api/v2/payment/:id` | Elimina una deuda. |
 
-Crear deuda:
+Body de creación:
 
 ```json
 {
   "description": "Cena",
-  "value": 50000,
-  "group": "ID_DEL_GRUPO",
+  "value": 45000,
+  "group": "66b4f424e02c14b86db53b01",
   "debtor": [
-    "ID_DEL_DEUDOR_1",
-    "ID_DEL_DEUDOR_2"
+    "66b4f424e02c14b86db53b02",
+    "66b4f424e02c14b86db53b03"
   ]
 }
 ```
 
-El valor se interpreta por persona y se crea un documento independiente para
-cada deudor.
+El usuario autenticado es el acreedor. Acreedor y deudores deben pertenecer al
+grupo, el valor debe ser finito y mayor que cero, no se permiten deudores
+repetidos y el acreedor no puede incluirse como deudor. Se persiste una deuda
+independiente por cada deudor.
 
-Los listados general y por grupo reciben `page` y `limit`. El resumen utiliza
-`debtsPage`, `creditsPage` y `limit` para navegar sus dos listas sin acoplarlas.
-Todos ordenan por `debtDate` y luego por `_id`, desde la deuda más reciente
-hasta la más antigua. Las páginas empiezan en 1, el límite predeterminado es 20
-y el máximo es 50.
+Solo el acreedor puede modificar o eliminar la deuda. Acreedor y deudor pueden
+marcarla como pagada. Una deuda pagada no puede procesarse otra vez ni modificar
+su descripción.
 
-## Historial de deudas
+## Paginación y ordenamiento
 
-Solicitud:
+Los listados se ordenan y paginan en MongoDB. El límite predeterminado es 20 y
+el máximo permitido es 50.
+
+Listados simples:
 
 ```http
-GET /api/payment/history?activePage=1&paidPage=1&limit=20
-Authorization: Bearer <token>
+GET /api/v2/group?page=1&limit=20
+GET /api/v2/payment?page=1&limit=20
+GET /api/v2/payment/group/ABC123?page=1&limit=20
+GET /api/v2/user/search/lau?page=1&limit=20
 ```
 
-Respuesta:
+Resumen con páginas independientes:
+
+```http
+GET /api/v2/payment/summary?debtsPage=1&creditsPage=1&limit=20
+```
+
+Historial con páginas independientes:
+
+```http
+GET /api/v2/payment/history?activePage=1&paidPage=1&limit=20
+```
+
+Ejemplo de metadatos de una lista:
 
 ```json
 {
-  "count": {
-    "total": 2,
-    "active": 1,
-    "paid": 1
-  },
+  "count": 42,
   "pagination": {
-    "active": {
-      "page": 1,
-      "limit": 20,
-      "totalPages": 1,
-      "hasNextPage": false,
-      "hasPreviousPage": false
-    },
-    "paid": {
-      "page": 1,
-      "limit": 20,
-      "totalPages": 1,
-      "hasNextPage": false,
-      "hasPreviousPage": false
-    }
-  },
-  "active": [
-    {
-      "_id": "ID_DEUDA_ACTIVA",
-      "description": "Cena",
-      "value": 50000,
-      "state": true,
-      "debtDate": "2026-07-20T18:00:00.000Z"
-    }
-  ],
-  "paid": [
-    {
-      "_id": "ID_DEUDA_PAGADA",
-      "description": "Transporte",
-      "value": 20000,
-      "state": false,
-      "debtDate": "2026-07-10T18:00:00.000Z",
-      "paymentDate": "2026-07-22T18:00:00.000Z"
-    }
-  ]
+    "page": 1,
+    "limit": 20,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
 }
 ```
 
-Las deudas activas se ordenan por `debtDate` y las pagadas por `paymentDate`,
-siempre desde la más reciente hasta la más antigua. Las deudas eliminadas
-físicamente no forman parte del historial.
-
-`activePage` y `paidPage` permiten avanzar cada lista de manera independiente.
-Todos los parámetros son opcionales: las páginas empiezan en `1`, el límite
-predeterminado es `20` y el máximo permitido es `50`. Los conteos representan
-todos los documentos encontrados, no solamente los de la página actual.
-
-## Índices y consultas paginadas
-
-El historial, los listados activos, el resumen, las deudas por grupo y los
-grupos del usuario se filtran, ordenan y paginan en MongoDB mediante `sort`,
-`skip` y `limit`; el servicio no carga la colección completa ni la ordena en
-memoria.
-Los esquemas declaran índices compuestos para:
-
-- acreedor o deudor, estado y fecha de creación;
-- acreedor o deudor, estado y fecha de pago;
-- grupo, estado y cada tipo de participante;
-- grupo, estado, participante, fecha de deuda e `_id` para páginas activas;
-- integrante, estado e `_id` para los grupos del usuario;
-- estado y nickname del usuario.
-
-El orden incluye `_id` como criterio de desempate para que una página sea
-determinista cuando varios documentos tienen la misma fecha o nickname. Los
-índices nuevos no son únicos y no eliminan índices existentes.
-
-La búsqueda parcial conserva la expresión regular insensible a mayúsculas para
-no cambiar su comportamiento. La paginación limita la respuesta, pero una
-expresión regular no anclada todavía puede examinar muchos usuarios. Si el
-volumen crece significativamente, conviene evaluar búsqueda por prefijo sobre
-un campo normalizado o MongoDB Atlas Search.
+El historial devuelve `data.active` y `data.paid`, ordenados desde la operación
+más reciente hasta la más antigua. Cada sección incluye sus conteos y
+metadatos dentro de `meta`.
 
 ## Consistencia financiera
 
-Crear, pagar y eliminar deudas, así como desactivar una cuenta, utiliza
-el contrato `transactionManager.runInTransaction(work)`. Su adaptador de
-infraestructura utiliza sesiones y transacciones de MongoDB.
+`owe` y `owes` no se persisten en el documento de usuario. El servicio de
+saldos los calcula desde las deudas activas, evitando mantener dos fuentes de
+verdad.
 
-- Si todas las operaciones funcionan, se confirma la transacción.
-- Si alguna operación falla, MongoDB revierte los documentos modificados.
-- El pago de una deuda no puede procesarse dos veces.
-- Crear, pagar o eliminar una deuda cambia automáticamente el saldo calculado.
-- Las deudas pagadas no forman parte de `owe` ni `owes`.
-- No se actualizan documentos de usuario durante las operaciones de deuda.
-- La desactivación consulta las deudas activas y modifica el usuario dentro de
-  la misma transacción, evitando cuentas inactivas con obligaciones abiertas.
+Crear, pagar y eliminar deudas utiliza el administrador de transacciones. Si
+falla una operación dentro del caso de uso, MongoDB aborta la transacción. El
+script `migrate:balances:dry-run` permite comprobar documentos antiguos antes
+de retirar campos derivados con `migrate:balances`.
+
+## Validación y seguridad
+
+- Los routers aceptan únicamente los campos declarados por endpoint.
+- Los parámetros, query strings y bodies se validan antes del controlador.
+- Los DTO de entrada descartan campos internos.
+- Los DTO de salida no exponen hashes, metadatos de Mongoose ni propiedades no
+  incluidas en el contrato.
+- Helmet agrega encabezados defensivos.
+- CORS utiliza una lista configurable de orígenes.
+- El body JSON tiene un límite configurable.
+- Login, registro y tráfico general tienen limitadores independientes cuando se
+  activa `RATE_LIMIT_ENABLED`.
+- Las rutas de usuarios, grupos y deudas aplican autorización además de JWT.
 
 ## Pruebas automatizadas
 
-La suite utiliza `node:test` y no necesita una conexión real a MongoDB. Los
-repositorios y el administrador de transacciones se sustituyen por
-implementaciones controladas durante las pruebas de los casos de uso. El ciclo
-de sesiones de Mongoose se comprueba por separado en las pruebas del adaptador.
-
-Cobertura inicial:
-
-- JWT ausente, mal formado, expirado, incompleto y válido.
-- Rechazo de tokens pertenecientes a usuarios inexistentes o desactivados.
-- Protección de campos internos durante el registro público.
-- Espera de MongoDB antes de abrir el puerto HTTP.
-- Contrato uniforme para errores de negocio.
-- Ocultamiento de mensajes y detalles técnicos en errores internos.
-- Propagación de excepciones asíncronas.
-- Errores JSON para rutas inexistentes y validaciones.
-- Validación de body y parámetros por endpoint.
-- Rechazo de campos desconocidos antes de consultar MongoDB.
-- Sanitización, conversión de tipos y DTO de entrada.
-- Bloqueo de campos internos en usuarios, grupos y deudas.
-- Protección global de rutas.
-- Propiedad del perfil y bloqueo de campos sensibles.
-- Membresía y administración de grupos.
-- Incorporación de integrantes.
-- Separación y orden del historial.
-- Paginación independiente, conteos totales y ordenamiento en MongoDB.
-- Paginación y orden estable de búsquedas parciales por nickname.
-- Paginación de deudas activas, resumen financiero, deudas por grupo y grupos
-  del usuario, con conteos totales y límites en MongoDB.
-- Definición de índices compuestos para deudas y usuarios.
-- Separación y superficie pública del servicio construido de deudas.
-- Propagación de dependencias desde composition root hasta routers.
-- Carga del composition root sin controladores, routers o middleware
-  predeterminados ocultos.
-- Importación de fábricas de router sin construir instancias.
-- Ausencia física de las fachadas retiradas en la versión 2.0.0.
-- Ausencia de archivos `index.js` vacíos y métodos de listado sin ruta.
-- Ruta canónica de grupos y deprecación compatible de `/api/group/mygroups`.
-- Sustitución de repositorios, JWT, bcrypt y servicios en pruebas.
-- Contratos, filtros activos y contexto transaccional de los repositorios.
-- Persistencia de integrantes encapsulada en el repositorio de grupos.
-- Reintentos limitados y colisiones concurrentes al generar códigos de grupo.
-- Reglas de deuda alineadas entre HTTP, servicios y Mongoose.
-- Nombres de grupo repetibles y auditoría no destructiva de datos históricos.
-- Inyección directa de conexión y puerto en `Server`.
-- Propagación de un único contexto transaccional.
-- Commit, abort, retorno y cierre de transacciones mediante el adaptador.
-- Cálculo indexado de `owe` y `owes` desde deudas activas.
-- Ausencia de escrituras de saldo al crear, pagar o eliminar deudas.
-- Simulación y ejecución protegida de la migración de campos heredados.
-- Envelope uniforme y DTO de salida explícitos para todos los controladores v2.
-- Montaje simultáneo de endpoints legacy y `/api/v2` sobre los mismos servicios.
-- Búsqueda exacta de nickname mediante un parámetro de ruta y sin body GET.
-- Ausencia de `_id`, `__v` y `password` en los recursos v2.
-- Headers dinámicos de deprecación y `Sunset` en toda la API legacy.
-- Registro estructurado y sin credenciales del consumo de `/api/*`.
-- Desactivación configurable de legacy sin afectar el montaje de v2.
-- Bloqueo transaccional de la desactivación cuando existen deudas activas.
-- Límites compartidos de nombre, nickname y correo en HTTP, servicios y
-  Mongoose.
-- Preservación exacta de mayúsculas en email y nickname, incluidos sus índices
-  únicos y búsquedas exactas.
-- Contraseña nueva con mínimo de 8 caracteres y compatibilidad de login para
-  cuentas históricas.
-- Conflictos específicos de email y nickname durante actualizaciones y
-  colisiones concurrentes.
-- Encabezados de Helmet, CORS local y límite de cuerpos JSON.
-- Rate limiting deshabilitado por defecto y contratos `429` de los tres
-  limitadores cuando se activan.
-- Validación central, normalización e inyección de variables de entorno.
-- Fallo de arranque previo a Express y MongoDB ante configuración inválida.
-
-Ejecutar:
+Ejecuta la suite completa:
 
 ```bash
 npm test
 ```
 
-La suite actual es principalmente unitaria. Como siguiente nivel de cobertura
-se pueden incorporar pruebas de integración contra una base MongoDB aislada.
+La cobertura incluye:
 
-## Respuestas de error
+- configuración y arranque;
+- seguridad HTTP, JWT y autorización de rutas;
+- validadores y DTO;
+- controladores v2 y contratos JSON;
+- servicios y reglas de negocio;
+- repositorios, índices y transacciones;
+- esquemas Mongoose e integridad de datos;
+- montaje exclusivo de `/api/v2` y manejo JSON de rutas inexistentes.
 
-Todos los errores utilizan el mismo contrato JSON:
+## Códigos de error frecuentes
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "GROUP_NOT_FOUND",
-    "message": "Grupo no encontrado"
-  }
-}
-```
+| Estado | Código | Motivo |
+|---|---|---|
+| `400` | `VALIDATION_ERROR` | Datos inválidos. |
+| `400` | `UNKNOWN_FIELDS` | Campos no admitidos por el endpoint. |
+| `401` | `TOKEN_MISSING` | Falta el encabezado Bearer. |
+| `401` | `TOKEN_INVALID_OR_EXPIRED` | JWT inválido o expirado. |
+| `403` | `FORBIDDEN` | El usuario no tiene permiso. |
+| `404` | `ROUTE_NOT_FOUND` | La ruta no existe. |
+| `409` | `USER_HAS_ACTIVE_DEBTS` | La cuenta participa en deudas activas. |
+| `409` | `DEBT_ALREADY_PAID` | La deuda ya fue pagada. |
+| `413` | `PAYLOAD_TOO_LARGE` | El body supera el límite configurado. |
+| `429` | `GLOBAL_RATE_LIMIT_EXCEEDED` | Se superó el límite general. |
+| `500` | `INTERNAL_SERVER_ERROR` | Error interno ocultado al cliente. |
 
-`code` es un identificador estable que el cliente puede utilizar para decidir
-qué acción o mensaje mostrar. `message` contiene la explicación destinada al
-usuario.
-
-Los errores de validación incluyen una lista `details`:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Los datos enviados no son válidos.",
-    "details": [
-      {
-        "type": "field",
-        "path": "email",
-        "message": "El correo es obligatorio",
-        "location": "body"
-      }
-    ]
-  }
-}
-```
-
-Los valores enviados por el cliente, incluidas las contraseñas, no se incluyen
-en `details`.
-
-Los campos que no pertenecen al contrato del endpoint producen:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "UNKNOWN_FIELDS",
-    "message": "La solicitud contiene campos no permitidos.",
-    "details": [
-      {
-        "path": "state",
-        "location": "body"
-      }
-    ]
-  }
-}
-```
-
-La API utiliza principalmente:
-
-| Estado | Significado |
-|---|---|
-| `400` | Datos o transición de estado inválidos. |
-| `401` | JWT ausente, inválido o expirado. |
-| `403` | Usuario autenticado sin permiso sobre el recurso. |
-| `404` | Recurso no encontrado. |
-| `409` | Conflicto con el estado o con un registro existente. |
-| `413` | Cuerpo de la solicitud demasiado grande. |
-| `500` | Error interno inesperado. |
-
-Los errores `500` siempre responden:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INTERNAL_SERVER_ERROR",
-    "message": "Ocurrió un error interno."
-  }
-}
-```
-
-El mensaje técnico original se registra únicamente en el servidor. Las rutas
-inexistentes también responden JSON con el código `ROUTE_NOT_FOUND` y los
-cuerpos JSON mal formados utilizan `INVALID_JSON`.
+El historial de cambios del proyecto se conserva en `CHANGELOG.md`.

@@ -22,7 +22,7 @@ const withHttpServer = async work => {
 
 test('el registro rechaza campos internos antes de consultar MongoDB', async () => {
     await withHttpServer(async baseUrl => {
-        const response = await fetch(`${baseUrl}/api/user`, {
+        const response = await fetch(`${baseUrl}/api/v2/user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -47,7 +47,7 @@ test('el registro rechaza campos internos antes de consultar MongoDB', async () 
 
 test('el registro devuelve VALIDATION_ERROR para datos inválidos', async () => {
     await withHttpServer(async baseUrl => {
-        const response = await fetch(`${baseUrl}/api/user`, {
+        const response = await fetch(`${baseUrl}/api/v2/user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -71,7 +71,7 @@ test('el registro devuelve VALIDATION_ERROR para datos inválidos', async () => 
 test('login no devuelve la contraseña dentro de errores de validación', async () => {
     await withHttpServer(async baseUrl => {
         const password = { contenido: 'secreto' };
-        const response = await fetch(`${baseUrl}/api/auth/login`, {
+        const response = await fetch(`${baseUrl}/api/v2/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

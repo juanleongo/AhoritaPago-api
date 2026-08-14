@@ -10,8 +10,8 @@ const {
     createAuthRouter
 } = require('../../src/routes/factories/createAuthRouter');
 const {
-    createUserRouter
-} = require('../../src/routes/factories/createUserRouter');
+    createUserRouterV2
+} = require('../../src/routes/v2/createUserRouter');
 
 const withHttpApp = async (app, work) => {
     const listener = app.listen(0);
@@ -133,7 +133,7 @@ describe('seguridad HTTP transversal', () => {
         let controllerWasCalled = false;
         const app = express();
         app.use(express.json());
-        app.use('/api/auth', createAuthRouter({
+        app.use('/api/v2/auth', createAuthRouter({
             authController: {
                 login(req, res) {
                     controllerWasCalled = true;
@@ -149,7 +149,7 @@ describe('seguridad HTTP transversal', () => {
         }));
 
         await withHttpApp(app, async baseUrl => {
-            const response = await fetch(`${baseUrl}/api/auth/login`, {
+            const response = await fetch(`${baseUrl}/api/v2/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: '{}'
@@ -168,7 +168,7 @@ describe('seguridad HTTP transversal', () => {
         let controllerWasCalled = false;
         const app = express();
         app.use(express.json());
-        app.use('/api/user', createUserRouter({
+        app.use('/api/v2/user', createUserRouterV2({
             authVerify(req, res, next) {
                 next();
             },
@@ -193,7 +193,7 @@ describe('seguridad HTTP transversal', () => {
         }));
 
         await withHttpApp(app, async baseUrl => {
-            const response = await fetch(`${baseUrl}/api/user`, {
+            const response = await fetch(`${baseUrl}/api/v2/user`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: '{}'

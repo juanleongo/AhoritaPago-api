@@ -192,7 +192,7 @@ describe('composition root e inyección de dependencias', () => {
         ]);
     });
 
-    it('propaga un servicio sustituido hasta su controlador y router', async () => {
+    it('propaga un servicio sustituido hasta el controlador y router v2', async () => {
         const calls = [];
         const injectedUserService = {
             async getUserByToken(user) {
@@ -216,7 +216,7 @@ describe('composition root e inyección de dependencias', () => {
             }
         };
 
-        await root.controllers.user.getUserByToken(
+        await root.controllers.v2.user.getUserByToken(
             { user: { userId: 'injected-user' } },
             res,
             error => {
@@ -226,8 +226,14 @@ describe('composition root e inyección de dependencias', () => {
 
         assert.deepEqual(calls, ['injected-user']);
         assert.equal(result.statusCode, 200);
-        assert.deepEqual(result.body, { uid: 'injected-user' });
-        assert.ok(root.routers.user.stack.length > 0);
+        assert.deepEqual(result.body, {
+            success: true,
+            data: { id: 'injected-user' }
+        });
+        assert.ok(root.routers.v2.user.stack.length > 0);
+        assert.deepEqual(Object.keys(root.controllers), ['v2']);
+        assert.deepEqual(Object.keys(root.routers), ['v2']);
+        assert.equal('legacyApi' in root.middleware, false);
     });
 
     it('construye v2 con los mismos servicios y un contrato uniforme', async () => {
