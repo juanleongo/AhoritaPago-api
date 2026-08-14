@@ -39,6 +39,14 @@ const findActiveById = async (id, options = {}) => (
     applyTransaction(Group.findOne({ _id: id, state: true }), options)
 );
 
+const lockActiveById = async (id, options = {}) => (
+    Group.findOneAndUpdate(
+        { _id: id, state: true },
+        { $inc: { __v: 1 } },
+        buildWriteOptions(options, { new: true, runValidators: true })
+    )
+);
+
 const findByCode = async (code, options = {}) => (
     applyTransaction(Group.findOne({ code }), options)
 );
@@ -92,5 +100,6 @@ module.exports = {
     findAllActiveByUser,
     findByCode,
     findById,
+    lockActiveById,
     updateById
 };

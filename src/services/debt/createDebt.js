@@ -111,7 +111,7 @@ const createCreateDebt = ({
         const debtorIds = validateDebtInput(debtData, creditorId);
 
         return transactionManager.runInTransaction(async transaction => {
-            const targetGroup = await groupRepository.findActiveById(
+            const targetGroup = await groupRepository.lockActiveById(
                 group,
                 { transaction }
             );

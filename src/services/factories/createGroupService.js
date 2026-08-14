@@ -140,7 +140,7 @@ const createGroupService = ({
 
     const deleteGroup = async (id, authenticatedUserId) => {
         return transactionManager.runInTransaction(async transaction => {
-            const existingGroup = await groupRepository.findActiveById(
+            const existingGroup = await groupRepository.lockActiveById(
                 id,
                 { transaction }
             );

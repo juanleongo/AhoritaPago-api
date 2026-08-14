@@ -142,7 +142,7 @@ describe('composition root e inyección de dependencias', () => {
                     }
                 },
                 group: {
-                    async findActiveById(id, options) {
+                    async lockActiveById(id, options) {
                         assert.deepEqual(options, { transaction });
                         return {
                             state: true,
@@ -197,8 +197,8 @@ describe('composition root e inyección de dependencias', () => {
                         calls.push(['deactivateById', id, options]);
                         return { _id: id, state: false };
                     },
-                    async findActiveById(id, options) {
-                        calls.push(['findActiveById', id, options]);
+                    async lockActiveById(id, options) {
+                        calls.push(['lockActiveById', id, options]);
                         return { _id: id, admin: 'admin-1' };
                     }
                 },
@@ -214,7 +214,7 @@ describe('composition root e inyección de dependencias', () => {
         assert.deepEqual(result, { _id: 'group-1', state: false });
         assert.deepEqual(calls, [
             ['runInTransaction'],
-            ['findActiveById', 'group-1', { transaction }],
+            ['lockActiveById', 'group-1', { transaction }],
             ['existsActiveByGroup', 'group-1', { transaction }],
             ['deactivateById', 'group-1', { transaction }]
         ]);

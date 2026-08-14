@@ -46,6 +46,7 @@ describe('contratos de repositorios', () => {
             'findAllActiveByUser',
             'findByCode',
             'findById',
+            'lockActiveById',
             'updateById'
         ]);
     });
@@ -630,6 +631,36 @@ describe('contratos de repositorios', () => {
         assert.deepEqual(receivedOperation, {
             id: 'group-1',
             update: { $addToSet: { members: 'user-1' } },
+            options: {
+                new: true,
+                runValidators: true,
+                session: transaction
+            }
+        });
+    });
+
+    it('bloquea condicionalmente un grupo activo en la transacción', async () => {
+        const originalFindOneAndUpdate = Group.findOneAndUpdate;
+        const transaction = { id: 'transaction-1' };
+        let receivedOperation;
+
+        Group.findOneAndUpdate = (filter, update, options) => {
+            receivedOperation = { filter, update, options };
+            return { _id: filter._id, state: true };
+        };
+
+        try {
+            await groupRepository.lockActiveById(
+                'group-1',
+                { transaction }
+            );
+        } finally {
+            Group.findOneAndUpdate = originalFindOneAndUpdate;
+        }
+
+        assert.deepEqual(receivedOperation, {
+            filter: { _id: 'group-1', state: true },
+            update: { $inc: { __v: 1 } },
             options: {
                 new: true,
                 runValidators: true,

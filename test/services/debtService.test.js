@@ -307,7 +307,7 @@ describe('debtService: historial y consistencia financiera', () => {
         await withStubs(
             groupRepository,
             {
-                findActiveById: async (id, options) => {
+                lockActiveById: async (id, options) => {
                     assert.deepEqual(options, { transaction });
                     return {
                         state: true,
@@ -419,7 +419,7 @@ describe('debtService: historial y consistencia financiera', () => {
         await withStubs(
             groupRepository,
             {
-                findActiveById: async () => ({
+                lockActiveById: async () => ({
                     state: true,
                     members: ['creditor', 'debtor-1', 'debtor-2']
                 })

@@ -90,6 +90,7 @@ recibir orígenes adicionales mediante `CORS_ALLOWED_ORIGINS`.
 | `npm start` | Inicia la aplicación. |
 | `npm run dev` | Inicia con nodemon. |
 | `npm test` | Ejecuta todas las pruebas automatizadas. |
+| `npm run test:integration` | Ejecuta la prueba concurrente sobre un replica set efímero. |
 | `npm run test:watch` | Ejecuta las pruebas en modo observación. |
 | `npm run audit:data` | Audita integridad de usuarios, grupos, deudas e índices. |
 | `npm run migrate:balances:dry-run` | Simula la eliminación de saldos persistidos. |
@@ -356,9 +357,17 @@ saldos los calcula desde las deudas activas, evitando mantener dos fuentes de
 verdad.
 
 Crear, pagar y eliminar deudas utiliza el administrador de transacciones. Si
-falla una operación dentro del caso de uso, MongoDB aborta la transacción. El
-script `migrate:balances:dry-run` permite comprobar documentos antiguos antes
-de retirar campos derivados con `migrate:balances`.
+falla una operación dentro del caso de uso, MongoDB aborta la transacción.
+
+Crear una deuda y desactivar su grupo realizan primero una escritura
+condicional sobre el mismo documento activo mediante `lockActiveById`. Si ambas
+operaciones son concurrentes, MongoDB genera un conflicto y `withTransaction`
+reintenta una de ellas con el estado actualizado. El resultado válido siempre
+es uno de estos dos: grupo activo con deuda activa, o grupo inactivo sin deudas
+activas.
+
+El script `migrate:balances:dry-run` permite comprobar documentos antiguos
+antes de retirar campos derivados con `migrate:balances`.
 
 ## Validación y seguridad
 
@@ -390,6 +399,8 @@ La cobertura incluye:
 - controladores v2 y contratos JSON;
 - servicios y reglas de negocio;
 - repositorios, índices y transacciones;
+- concurrencia real entre creación de deuda y desactivación de grupo sobre un
+  replica set efímero;
 - esquemas Mongoose e integridad de datos;
 - montaje exclusivo de `/api/v2` y manejo JSON de rutas inexistentes.
 
