@@ -51,7 +51,9 @@ describe('auditoría de integridad de datos', () => {
             'DEBTOR_ITEM_INVALID',
             'DEBTOR_DUPLICATED',
             'CREDITOR_IS_DEBTOR',
-            'VALUE_NOT_POSITIVE'
+            'VALUE_NOT_POSITIVE',
+            'VALUE_NOT_INTEGER_COP',
+            'VALUE_OUT_OF_SAFE_RANGE'
         ].forEach(issue => assert.match(pipeline, new RegExp(issue)));
     });
 

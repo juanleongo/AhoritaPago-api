@@ -25,8 +25,8 @@ describe('createDebt: reglas defensivas de entrada', () => {
         );
     });
 
-    it('rechaza valores que no sean positivos y finitos', async () => {
-        for (const value of [0, -1, Infinity]) {
+    it('rechaza valores que no sean enteros COP positivos y seguros', async () => {
+        for (const value of [0, -1, 1.5, Infinity]) {
             await assert.rejects(
                 () => createDebt(buildDebt({ value }), { userId: creditorId }),
                 rejectsCode('DEBT_VALUE_INVALID')

@@ -1,4 +1,5 @@
 const { createHttpError } = require('../../helpers/httpError');
+const { parseCopAmount } = require('../../helpers/copMoney');
 
 const validateDebtInput = (debtData, creditorId) => {
     const { description, debtor: debtors, value, group } = debtData;
@@ -26,10 +27,14 @@ const validateDebtInput = (debtData, creditorId) => {
         );
     }
 
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    let normalizedValue;
+
+    try {
+        normalizedValue = parseCopAmount(value);
+    } catch {
         throw createHttpError(
             400,
-            'El valor de la deuda debe ser un número mayor que cero.',
+            'El valor debe ser un entero positivo en pesos COP.',
             'DEBT_VALUE_INVALID'
         );
     }
@@ -62,7 +67,7 @@ const validateDebtInput = (debtData, creditorId) => {
         );
     }
 
-    return uniqueDebtorIds;
+    return { debtorIds: uniqueDebtorIds, value: normalizedValue };
 };
 
 const createCreateDebt = ({
@@ -106,9 +111,12 @@ const createCreateDebt = ({
     };
 
     const createDebt = async (debtData, creditorData) => {
-        const { description, value, group } = debtData;
+        const { description, group } = debtData;
         const creditorId = creditorData.userId;
-        const debtorIds = validateDebtInput(debtData, creditorId);
+        const {
+            debtorIds,
+            value
+        } = validateDebtInput(debtData, creditorId);
 
         return transactionManager.runInTransaction(async transaction => {
             const targetGroup = await groupRepository.lockActiveById(

@@ -329,7 +329,7 @@ describe('debtService: historial y consistencia financiera', () => {
                         const debts = await service.createDebt(
                             {
                                 description: 'Cena',
-                                value: 50,
+                                value: '1.500',
                                 group: 'group-1',
                                 debtor: ['debtor']
                             },
@@ -344,6 +344,7 @@ describe('debtService: historial y consistencia financiera', () => {
 
         assert.equal(state.committed, true);
         assert.equal(createdDebts.length, 1);
+        assert.equal(createdDebts[0].value, 1500);
     });
 
     it('marca una deuda como pagada con el mismo contexto', async () => {

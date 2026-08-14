@@ -103,7 +103,7 @@ describe('DTO de salida v2', () => {
             state: true,
             creditor: { _id: 'user-1', name: 'Laura' },
             debtor: [{ _id: 'user-2', nickname: 'leon' }],
-            value: 50,
+            value: 50n,
             group: { _id: 'group-1', name: 'Amigos', code: 'ABC123' },
             debtDate: '2026-08-01T00:00:00.000Z',
             __v: 1
@@ -125,7 +125,7 @@ describe('DTO de salida v2', () => {
                 description: 'Cena',
                 group: 'Amigos',
                 date: '2026-08-01',
-                amount: 50,
+                amount: 50n,
                 with: 'Laura',
                 internal: true
             }],

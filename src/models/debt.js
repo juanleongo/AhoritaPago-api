@@ -1,4 +1,5 @@
 const { Schema, model } = require('mongoose');
+const { isValidCopAmount } = require('../helpers/copMoney');
 
 const hasDebtors = debtors => (
     Array.isArray(debtors) && debtors.length > 0
@@ -78,11 +79,13 @@ const DebtSchema = new Schema({
         required: false
     },
     value: {
-        type: Number,
+        type: Schema.Types.BigInt,
         required: [true, 'El valor de la deuda es obligatorio'],
         validate: {
-            validator: value => Number.isFinite(value) && value > 0,
-            message: 'El valor de la deuda debe ser mayor que cero'
+            validator: isValidCopAmount,
+            message: (
+                'El valor debe ser un número entero de pesos COP mayor que cero'
+            )
         }
     },
     group: {

@@ -1,3 +1,5 @@
+const { toCopNumber } = require('../../helpers/copMoney');
+
 const getUserId = user => user?._id ?? user?.uid;
 
 const toPublicUser = user => {
@@ -19,9 +21,17 @@ const toPublicUser = user => {
     return publicUser;
 };
 
+const normalizeCopBalance = value => {
+    try {
+        return toCopNumber(value ?? 0, { allowZero: true });
+    } catch {
+        return 0;
+    }
+};
+
 const normalizeBalance = balance => ({
-    owe: Number.isFinite(balance?.owe) ? balance.owe : 0,
-    owes: Number.isFinite(balance?.owes) ? balance.owes : 0
+    owe: normalizeCopBalance(balance?.owe),
+    owes: normalizeCopBalance(balance?.owes)
 });
 
 const createBalanceService = ({ debtRepository }) => {

@@ -5,6 +5,7 @@ const {
     buildWriteOptions
 } = require('./repositoryOptions');
 const { getPaginationOffset } = require('../helpers/pagination');
+const { toCopNumber } = require('../helpers/copMoney');
 
 const historyFilter = (userId, state) => ({
     state,
@@ -144,8 +145,8 @@ const getActiveBalanceByUserId = async (userId, options = {}) => {
     );
 
     return {
-        owe: balance?.owe ?? 0,
-        owes: balance?.owes ?? 0
+        owe: toCopNumber(balance?.owe ?? 0, { allowZero: true }),
+        owes: toCopNumber(balance?.owes ?? 0, { allowZero: true })
     };
 };
 

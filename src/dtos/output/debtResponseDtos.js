@@ -4,6 +4,13 @@ const {
     toId,
     toPlainObject
 } = require('./resourceDto');
+const { toCopNumber } = require('../../helpers/copMoney');
+
+const optionalCopNumber = value => (
+    value === undefined || value === null
+        ? undefined
+        : toCopNumber(value)
+);
 
 const debtResponseDto = debt => {
     const source = toPlainObject(debt);
@@ -22,7 +29,7 @@ const debtResponseDto = debt => {
                 ['name', 'nickname']
             ))
             : [],
-        value: source.value,
+        value: optionalCopNumber(source.value),
         group: createReferenceDto(source.group, ['name', 'code']),
         debtDate: source.debtDate,
         paymentDate: source.paymentDate
@@ -33,7 +40,7 @@ const debtSummaryItemDto = item => compactObject({
     description: item.description,
     group: item.group,
     date: item.date,
-    amount: item.amount,
+    amount: optionalCopNumber(item.amount),
     with: item.with
 });
 

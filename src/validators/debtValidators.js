@@ -1,5 +1,9 @@
 const { body } = require('express-validator');
 const { mongoIdParam } = require('./commonValidators');
+const {
+    isValidCopAmount,
+    parseCopAmount
+} = require('../helpers/copMoney');
 
 const debtIdValidators = [mongoIdParam()];
 
@@ -15,9 +19,13 @@ const createDebtValidators = [
         .notEmpty()
         .withMessage('El valor de la deuda es obligatorio.')
         .bail()
-        .isFloat({ gt: 0 })
-        .withMessage('El valor de la deuda debe ser mayor que cero.')
-        .toFloat(),
+        .custom(isValidCopAmount)
+        .withMessage(
+            'El valor debe ser un entero positivo en pesos COP. '
+            + 'Use 1500 o "1.500".'
+        )
+        .bail()
+        .customSanitizer(parseCopAmount),
     body('group')
         .isMongoId()
         .withMessage('El grupo debe ser un ObjectId válido.'),

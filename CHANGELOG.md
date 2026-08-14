@@ -2,6 +2,19 @@
 
 ## Sin publicar
 
+### Importes enteros en pesos colombianos (REC-20)
+
+- Las deudas almacenan `value` como BSON `Int64` mediante el tipo `BigInt` de
+  Mongoose y los balances se calculan desde esos enteros.
+- La API acepta cantidades enteras como `1500` y cadenas con separadores de
+  miles colombianos como `"1.500"`, pero rechaza decimales sin redondearlos.
+- Los DTO conservan `value`, `amount`, `owe` y `owes` como números JSON dentro
+  del rango seguro.
+- Se incorporó una migración idempotente con `dry-run`, confirmación explícita
+  y verificación posterior para convertir valores anteriores a BSON `Int64`.
+- La auditoría de integridad ahora detecta importes fraccionarios y cantidades
+  que superan el rango exacto admitido.
+
 ### Retiro gradual de la API legacy (REC-21)
 
 - Todos los endpoints `/api/*` sin versión anuncian `Deprecation`, un `Link`

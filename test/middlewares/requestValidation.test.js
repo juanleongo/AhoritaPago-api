@@ -104,13 +104,13 @@ describe('validación y DTO de solicitud', () => {
         });
     });
 
-    it('sanitiza una deuda válida y convierte value a número', async () => {
+    it('normaliza una deuda expresada con miles colombianos', async () => {
         const creditorId = '507f1f77bcf86cd799439011';
         const debtorId = '507f191e810c19729de860ea';
         const result = await runValidation(createDebtValidators, {
             body: {
                 description: '  Cena del grupo  ',
-                value: '50000.50',
+                value: '50.000',
                 group: creditorId,
                 debtor: [debtorId]
             }
@@ -120,10 +120,35 @@ describe('validación y DTO de solicitud', () => {
         assert.equal(result.nextCalled, true);
         assert.deepEqual(result.req.validated.body, {
             description: 'Cena del grupo',
-            value: 50000.5,
+            value: 50000,
             group: creditorId,
             debtor: [debtorId]
         });
+    });
+
+    it('acepta pesos sin separador y rechaza cantidades decimales', async () => {
+        const validResult = await runValidation(createDebtValidators, {
+            body: {
+                description: 'Cena',
+                value: 1500,
+                group: '507f1f77bcf86cd799439011',
+                debtor: ['507f191e810c19729de860ea']
+            }
+        });
+        const invalidResult = await runValidation(createDebtValidators, {
+            body: {
+                description: 'Cena',
+                value: 1.5,
+                group: '507f1f77bcf86cd799439011',
+                debtor: ['507f191e810c19729de860ea']
+            }
+        });
+
+        assert.equal(validResult.nextCalled, true);
+        assert.equal(validResult.req.validated.body.value, 1500);
+        assert.equal(invalidResult.nextCalled, false);
+        assert.equal(invalidResult.error.errorCode, 'VALIDATION_ERROR');
+        assert.equal(invalidResult.error.details[0].path, 'value');
     });
 
     it('rechaza valores y ObjectId inválidos en una deuda', async () => {

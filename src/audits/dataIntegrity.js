@@ -6,6 +6,7 @@ const {
     normalizeName,
     normalizeNickname
 } = require('../config/userIdentity');
+const { MAX_COP_AMOUNT } = require('../helpers/copMoney');
 
 const buildDebtIntegrityPipeline = () => [
     {
@@ -119,6 +120,37 @@ const buildDebtIntegrityPipeline = () => [
                                 ]
                             },
                             ['VALUE_NOT_POSITIVE'],
+                            []
+                        ]
+                    },
+                    {
+                        $cond: [
+                            {
+                                $cond: [
+                                    { $isNumber: '$value' },
+                                    {
+                                        $ne: [
+                                            { $trunc: '$value' },
+                                            '$value'
+                                        ]
+                                    },
+                                    false
+                                ]
+                            },
+                            ['VALUE_NOT_INTEGER_COP'],
+                            []
+                        ]
+                    },
+                    {
+                        $cond: [
+                            {
+                                $cond: [
+                                    { $isNumber: '$value' },
+                                    { $gt: ['$value', MAX_COP_AMOUNT] },
+                                    false
+                                ]
+                            },
+                            ['VALUE_OUT_OF_SAFE_RANGE'],
                             []
                         ]
                     }

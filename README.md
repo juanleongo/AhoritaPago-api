@@ -11,6 +11,7 @@ HTTP soportada se publica exclusivamente bajo `/api/v2` y responde en JSON.
 - Creación, consulta, actualización y pago de deudas con historial permanente.
 - Historial separado entre deudas activas y pagadas.
 - Resumen financiero y saldos calculados desde las deudas activas.
+- Importes COP enteros, almacenados como `Int64` sin cálculos con flotantes.
 - Paginación y ordenamiento de listados desde MongoDB.
 
 ## Tecnologías
@@ -95,6 +96,8 @@ recibir orígenes adicionales mediante `CORS_ALLOWED_ORIGINS`.
 | `npm run audit:data` | Audita integridad de usuarios, grupos, deudas e índices. |
 | `npm run migrate:balances:dry-run` | Simula la eliminación de saldos persistidos. |
 | `npm run migrate:balances` | Elimina `owe` y `owes` persistidos en usuarios. |
+| `npm run migrate:money:dry-run` | Audita los importes antes de convertirlos a enteros COP. |
+| `npm run migrate:money` | Convierte los importes válidos a BSON `Int64`. |
 
 ## Arquitectura
 
@@ -296,9 +299,16 @@ Body de creación:
 ```
 
 El usuario autenticado es el acreedor. Acreedor y deudores deben pertenecer al
-grupo, el valor debe ser finito y mayor que cero, no se permiten deudores
+grupo, el valor debe ser un entero COP mayor que cero, no se permiten deudores
 repetidos y el acreedor no puede incluirse como deudor. Se persiste una deuda
 independiente por cada deudor.
+
+Los importes representan pesos colombianos completos, sin centavos. `value`
+acepta un entero JSON como `1500` o una cadena con separadores de miles
+colombianos como `"1.500"`; ambos se normalizan a `1500`. No debe enviarse
+`1.500` como número JSON porque el parser lo interpreta como `1.5` y la API lo
+rechaza por ser decimal. Las respuestas conservan `value`, `amount`, `owe` y
+`owes` como números enteros.
 
 Solo el acreedor puede modificar la deuda. Acreedor y deudor pueden marcarla
 como pagada. Una deuda pagada conserva su documento con `state: false` y
@@ -358,6 +368,10 @@ metadatos dentro de `meta`.
 saldos los calcula desde las deudas activas, evitando mantener dos fuentes de
 verdad.
 
+Los valores de las deudas se persisten como enteros BSON `Int64`. Los servicios
+y las agregaciones operan en pesos COP completos y los DTO verifican que cada
+resultado pueda representarse como un entero seguro antes de devolverlo.
+
 Crear y pagar deudas utiliza el administrador de transacciones. Si
 falla una operación dentro del caso de uso, MongoDB aborta la transacción.
 
@@ -370,6 +384,27 @@ activas.
 
 El script `migrate:balances:dry-run` permite comprobar documentos antiguos
 antes de retirar campos derivados con `migrate:balances`.
+
+Para migrar valores monetarios existentes, primero ejecuta la auditoría sin
+escrituras:
+
+```bash
+npm run migrate:money:dry-run
+```
+
+Si `invalidCount` es cero, realiza un respaldo y autoriza expresamente la
+conversión antes de ejecutarla:
+
+```env
+CONFIRM_COP_MONEY_MIGRATION=CONVERT_DEBT_VALUES_TO_COP_INTEGERS
+```
+
+```bash
+npm run migrate:money
+```
+
+La migración es idempotente. No redondea valores decimales: si encuentra uno,
+se detiene antes de modificar documentos para que sea revisado manualmente.
 
 ## Validación y seguridad
 
@@ -401,6 +436,7 @@ La cobertura incluye:
 - controladores v2 y contratos JSON;
 - servicios y reglas de negocio;
 - repositorios, índices y transacciones;
+- normalización, almacenamiento `Int64`, balances y migración de importes COP;
 - permanencia de las deudas pagadas y clasificación en `history.paid`;
 - concurrencia real entre creación de deuda y desactivación de grupo sobre un
   replica set efímero;

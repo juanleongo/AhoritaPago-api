@@ -76,6 +76,8 @@ describe('integridad de los esquemas Mongoose', () => {
         await debt.validate();
 
         assert.equal(debt.description, 'Cena');
+        assert.equal(debt.value, 100n);
+        assert.equal(Debt.schema.path('value').instance, 'BigInt');
     });
 
     it('requiere un acreedor', async () => {
@@ -124,7 +126,7 @@ describe('integridad de los esquemas Mongoose', () => {
         );
     });
 
-    for (const invalidValue of [undefined, 0, -1, Infinity]) {
+    for (const invalidValue of [undefined, 0, -1, 1.5, Infinity]) {
         it(`rechaza el valor inválido ${String(invalidValue)}`, async () => {
             await assert.rejects(
                 () => buildDebt({ value: invalidValue }).validate(),
